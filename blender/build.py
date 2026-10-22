@@ -80,7 +80,7 @@ def main():
     if not args.no_site:
         site = Site(house_extent())
         site.build(mats, get_collection('Site'))
-        info.update(people=site.people, trees_placed=site.trees, cars=site.cars, palms=site.palms)
+        info.update(people=site.people, trees_placed=site.trees, cars=site.cars, palms=site.palms, lamps=site.lamps)
     from hoji.building import terrace_plants
     info['terrace_plants'] = terrace_plants()
     out = os.path.abspath(args.out)

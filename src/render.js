@@ -14,13 +14,15 @@ const TONE = ['neutral', 'agx', 'aces'].includes(params.get('tonemap')) ? params
 const THREE_TONE = { neutral: THREE.NeutralToneMapping, agx: THREE.AgXToneMapping, aces: THREE.ACESFilmicToneMapping };
 
 export function createRenderer() {
-  const probe = document.createElement('canvas');
-  if (!window.WebGL2RenderingContext || !probe.getContext('webgl2')) throw new Error('WebGL 2 is not available');
-  const renderer = new THREE.WebGLRenderer({
-    antialias: Q.level !== 'high', // high renders into a multisampled target instead
-    powerPreference: 'high-performance',
-    stencil: false,
-  });
+  // an opaque canvas (three.js asks for one with an alpha channel): the leaves' alpha to coverage
+  // leaves a pixel's alpha under 1 where a card's edge only partly covers it, and the page's light
+  // background showed through the crowns as pale speckles (glaring at night)
+  const canvas = document.createElement('canvas');
+  const antialias = Q.level !== 'high'; // high renders into a multisampled target instead
+  const context = window.WebGL2RenderingContext &&
+    canvas.getContext('webgl2', { alpha: false, depth: true, stencil: false, antialias, premultipliedAlpha: true, powerPreference: 'high-performance' });
+  if (!context) throw new Error('WebGL 2 is not available');
+  const renderer = new THREE.WebGLRenderer({ canvas, context, antialias, powerPreference: 'high-performance', stencil: false });
   renderer.setPixelRatio(Q.pixelRatio);
   renderer.setSize(innerWidth, innerHeight);
   renderer.shadowMap.enabled = true;

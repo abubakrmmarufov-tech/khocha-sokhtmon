@@ -112,7 +112,8 @@ function city(scene) {
 // dark green-grey (only the windows' reflections see it). Colours are the renders' (linear).
 const SKY_GLSL_STOPS = [[-90, [38, 46, 34]], [-1, [70, 80, 64]], [0, [178, 210, 244]], [2, [150, 196, 242]], [5, [103, 169, 234]],
   [10, [54, 138, 227]], [15, [22, 117, 213]], [30, [12, 98, 203]], [90, [8, 82, 190]]];
-function makeSky(sunDir, trees = false) {
+// light: the sky's brightness, 0..1 (src/night.js dims it at dusk; the dome of the night sky covers it)
+function makeSky(sunDir, trees = false, light = { value: 1 }) {
   const lin = (c) => ((c / 255 + 0.055) / 1.055) ** 2.4;
   const el = SKY_GLSL_STOPS.map((s) => s[0]);
   const col = SKY_GLSL_STOPS.map((s) => new THREE.Vector3(...s[1].map(lin)));
@@ -128,6 +129,7 @@ function makeSky(sunDir, trees = false) {
       uSun: { value: sunDir.clone().normalize() },
       uCover: { value: +(LIGHT.get('clouds') ?? 0.68) },
       uTrees: { value: trees ? 1 : 0 },
+      uLight: light,
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -142,6 +144,7 @@ function makeSky(sunDir, trees = false) {
       uniform vec3 uSun;
       uniform float uCover;
       uniform float uTrees;
+      uniform float uLight;
       varying vec3 vDir;
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p) {
@@ -200,7 +203,7 @@ function makeSky(sunDir, trees = false) {
           vec3 leaf = mix(vec3(0.018, 0.032, 0.014), vec3(0.06, 0.09, 0.035), fbm(vec2(az * 60.0, e * 0.6)));
           col = mix(col, leaf, tree * step(-3.0, e));
         }
-        gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(col * uLight, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -230,7 +233,8 @@ export function buildWorld(scene, renderer, after = Promise.resolve()) {
 
   // aerial perspective: the city a kilometre out a little hazy, the complex (100-400 m) clear
   scene.fog = new THREE.FogExp2(HAZE.getHex(), +(LIGHT.get('fog') ?? 0.0011));
-  scene.add(makeSky(sunDir));
+  const skyLight = { value: 1 };
+  scene.add(makeSky(sunDir, false, skyLight));
   scene.background = null;
   scene.backgroundIntensity = SKY_INTENSITY;
   scene.environmentIntensity = SKY_INTENSITY;
@@ -288,6 +292,15 @@ export function buildWorld(scene, renderer, after = Promise.resolve()) {
     }
   }
   const { mat: cityMat, trees: cityTrees } = city(scene);
+  // the street lights along those streets, out to the city: lit at night (src/night.js)
+  const cityLights = [];
+  for (let r = 250; r < 2600; r += 32) {
+    for (const sgn of [-1, 1]) {
+      const x = sgn * r;
+      cityLights.push({ x, y: 8.6, z: -(MAIN.near - 2) }, { x: x + sgn * 16, y: 8.6, z: -(MAIN.green + 2) }, { x, y: 8.6, z: -85.5 });
+      cityLights.push({ x: -93.5, y: 8.6, z: -x }, { x: 93.5, y: 8.6, z: -x });
+    }
+  }
 
   const pmrem = new THREE.PMREMGenerator(renderer);
   const hdr = new RGBELoader().setDataType(THREE.FloatType);
@@ -378,7 +391,9 @@ export function buildWorld(scene, renderer, after = Promise.resolve()) {
           }
         }
       });
-      fill.removeFromParent();
+      // dark from now on, kept for the moonlit sky at night (src/night.js): the number of lights stays
+      // the same, so no shader is rebuilt when the evening comes
+      fill.intensity = 0;
       pmrem.dispose();
     })
     .catch((e) => console.warn('sky', e));
@@ -397,15 +412,18 @@ export function buildWorld(scene, renderer, after = Promise.resolve()) {
   });
 
   // The sun turned round the house (each client render lights the face the camera looks at most
-  // squarely, from a little to its side): azimuth in degrees from north, clockwise. The sky's light
-  // turns with it, the visible sky does not.
+  // squarely, from a little to its side): azimuth in degrees from north, clockwise; elevation in
+  // radians, the afternoon's by default (src/night.js lowers it for other hours). The sun keeps its
+  // distance from what it aims at (the house; indoors the flat, src/main.js lightInterior). The
+  // sky's light turns with it, the visible sky does not.
   const ELEV = Math.asin(sunDir.y);
   const HDRI_AZ = THREE.MathUtils.radToDeg(Math.atan2(skyInfo.sun_dir[0], -skyInfo.sun_dir[2]));
-  const aimSun = (az) => {
+  const aimSun = (az, el = ELEV) => {
     const a = THREE.MathUtils.degToRad(az);
-    sun.position.set(Math.sin(a) * Math.cos(ELEV), Math.sin(ELEV), -Math.cos(a) * Math.cos(ELEV)).multiplyScalar(600);
+    const d = sun.position.distanceTo(sun.target.position) || 600;
+    sun.position.set(Math.sin(a) * Math.cos(el), Math.sin(el), -Math.cos(a) * Math.cos(el)).multiplyScalar(d).add(sun.target.position);
     sun.updateMatrixWorld();
     scene.environmentRotation.set(0, -THREE.MathUtils.degToRad(az - HDRI_AZ), 0);
   };
-  return { sun, cityMat, aimSun, ready: Promise.all([ready, props]) };
+  return { sun, fill, cityMat, cityLights, aimSun, elevation: ELEV, skyLight, ready: Promise.all([ready, props]) };
 }

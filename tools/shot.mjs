@@ -71,7 +71,7 @@ if (flag('bare') || flag('nosite')) {
 for (const s of shots) {
   await page.evaluate(({ s, ui }) => {
     const app = window.__app;
-    for (const id of ['ext-ui', 'labels', 'places', 'tooltip', 'quality', 'eye']) {
+    for (const id of ['ext-ui', 'labels', 'places', 'tooltip', 'quality', 'eye', 'daytime']) {
       const el = document.getElementById(id);
       if (el) el.style.visibility = ui ? '' : 'hidden';
     }

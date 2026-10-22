@@ -1,5 +1,5 @@
 // Screenshots inside a flat in walk mode from given spots, and what is under given pixels.
-//   node tools/walk_views.mjs OUTDIR FLAT x,y,bearing[,pitch] ...   [--pick u,v]
+//   node tools/walk_views.mjs OUTDIR FLAT x,y,bearing[,pitch] ...   [--pick u,v]   (env HOURS=21: at night)
 // x, y: plan metres; bearing: compass degrees (0 = north = +y, 90 = east); pitch: degrees (down < 0).
 // --pick u,v (pixels of the 1280 x 800 view): reports the mesh, material and plan point hit there,
 // for every view.
@@ -31,6 +31,11 @@ await page.evaluate(async (flat) => {
   for (const id of ['walk-ui', 'eye']) document.getElementById(id).style.visibility = 'hidden';
 }, flat);
 if (process.env.ALL) await page.evaluate(() => (window.__ALLHITS = true));
+// HOURS=21: at that hour of the day (src/night.js)
+if (process.env.HOURS) {
+  await page.waitForFunction(() => window.__app.daytime, null, { timeout: 60000 });
+  await page.evaluate((h) => window.__app.setHours(h), +process.env.HOURS);
+}
 await page.waitForTimeout(2500);
 let i = 0;
 for (const v of views) {

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { TOWERS, planFrame, toScene, towerByKey } from './config.js';
+import { LAMPS, TOWERS, planFrame, toScene, towerByKey } from './config.js';
 import { bounds, interiorPoint } from './geometry.js';
 import { apartments, aptsOnFloor, summaryOf } from './data.js';
 import { buildWorld } from './world.js';
@@ -16,6 +16,8 @@ import { createRenderer, createPipeline } from './render.js';
 import { setupMaterial, water } from './materials.js';
 import { updateCars } from './props.js';
 import { BRAND, L, getLang, num, setLang } from './i18n.js';
+import { DAY, FIRST, LAST, clock as hhmm, timeOfDay } from './night.js';
+import { ROOM_LIGHT } from './interior/materials.js';
 
 const $ = (s) => document.querySelector(s);
 const ACCENT = 0xc8955a;
@@ -34,6 +36,8 @@ function applyStatic() {
   const q = $('#quality');
   q.textContent = L().quality(Q.level === 'high');
   q.title = L().qualityTitle(Q.level === 'high');
+  $('#daytime-range').setAttribute('aria-label', L().dayTime);
+  $('#daytime').title = L().dayTime;
   document.title = `${L().brand} — 3D`;
   document.querySelector('.logo').textContent = BRAND[getLang()].logo;
 }
@@ -127,6 +131,45 @@ modelLoad
   });
 
 $('#quality').onclick = () => setQuality(Q.level === 'high' ? 'low' : 'high');
+
+// ---------- time of day (src/night.js) ----------
+// the slider from early morning to late night; the site starts in the afternoon light it was made for
+let daytime = null;
+const dtRange = $('#daytime-range'), dtClock = $('#daytime-clock');
+dtRange.min = FIRST;
+dtRange.max = LAST;
+dtRange.step = 0.25;
+dtRange.value = DAY;
+function showHours(h) {
+  dtClock.textContent = hhmm(h);
+  const s = daytime?.state;
+  $('#daytime').dataset.phase = !s ? 'day' : s.night > 0.5 ? 'night' : s.lights > 0.05 || h > 17.5 ? 'dusk' : 'day';
+  dtRange.style.setProperty('--k', `${((h - FIRST) / (LAST - FIRST)) * 100}%`);
+}
+function setHours(h) {
+  if (!daytime) return;
+  daytime.set(h);
+  dtRange.value = daytime.hours;
+  showHours(daytime.hours);
+}
+showHours(DAY);
+Promise.all([modelLoad, world.ready])
+  .then(() => {
+    daytime = timeOfDay({
+      scene, renderer, world, lamps: LAMPS, toScene, cityLights: world.cityLights,
+      changed: () => {
+        lightIndoors();
+        shadowsDirty();
+      },
+    });
+    if (sunAz !== null) daytime.follow(sunAz);
+    daytime.indoors(!!outdoor);
+    $('#daytime').hidden = false;
+  })
+  .catch((e) => console.warn('time of day', e));
+dtRange.addEventListener('input', () => setHours(+dtRange.value));
+// let go of the slider: the arrow keys walk again (a focused slider would take them)
+dtRange.addEventListener('pointerup', () => dtRange.blur());
 
 // ---------- state ----------
 const state = {
@@ -604,6 +647,24 @@ function enterWalk(a) {
   });
 }
 
+// the sun back over its saved spot, at its saved distance, from where it stands now (the hour may
+// have been changed meanwhile)
+function sunBack(saved) {
+  const sun = world.sun;
+  const dir = sun.position.clone().sub(sun.target.position).normalize();
+  sun.target.position.copy(saved.target);
+  sun.position.copy(saved.target).addScaledVector(dir, saved.pos.distanceTo(saved.target));
+}
+
+// Indoors at night: the light is the rooms' own (ROOM_LIGHT on the interior's materials), the
+// studio light that fills the whole scene turned down, so the street seen from the window is dark
+function lightIndoors() {
+  if (!outdoor) return;
+  const L = daytime?.state.lights ?? 0;
+  scene.environmentIntensity = 0.32 * (1 - 0.75 * L);
+  bounce.intensity = 0.9 * (1 - 0.85 * L);
+}
+
 // Indoors: a studio-like environment instead of the sky, the sun's shadow pulled in round the flat.
 let roomEnv = null, outdoor = null, bounce = null;
 function lightInterior(interior) {
@@ -626,12 +687,13 @@ function lightInterior(interior) {
   } else if (outdoor) {
     bounce?.removeFromParent();
     scene.environment = outdoor.env;
-    scene.environmentIntensity = outdoor.envI;
+    scene.environmentIntensity = daytime ? daytime.state.env : outdoor.envI;
     [sc.left, sc.right, sc.top, sc.bottom, sc.near, sc.far] = outdoor.cam;
-    sun.position.copy(outdoor.pos);
-    sun.target.position.copy(outdoor.target);
+    sunBack(outdoor);
     outdoor = null;
   }
+  daytime?.indoors(!!interior);
+  lightIndoors();
   sun.target.updateMatrixWorld();
   sc.updateProjectionMatrix();
   shadowsDirty();
@@ -905,7 +967,8 @@ function followSun(dt) {
     sunAz += d * Math.min(1, dt * 3.0);
     if (Math.abs(d) < 0.3) sunAz = goal;
   }
-  world.aimSun(sunAz);
+  if (daytime) daytime.follow(sunAz);
+  else world.aimSun(sunAz);
   shadowsDirty();
 }
 
@@ -937,6 +1000,8 @@ renderer.setAnimationLoop(() => {
     if (building) updateLabels();
   }
   for (const n of water) n.offset.x += dt * 0.006, n.offset.y += dt * 0.004;
+  // the rooms' own light at night: an open floor seen from outside, or the flat walked through
+  ROOM_LIGHT.value = !daytime ? 0 : daytime.state.lights * (state.mode === 'walk' ? 0.38 : 0.55);
   if (state.mode !== 'walk') followSun(dt);
   updateCars(camera);
   if (shadowFrames > 0) {
@@ -991,7 +1056,8 @@ window.__app = {
   THREE, scene, camera, controls, renderer, state, walk, apartments, pipeline, world, quality: Q,
   get building() { return building; },
   get interior() { return walkInterior; },
-  selectFloor, selectApt, enterWalk, exitWalk, goOverview,
+  get daytime() { return daytime; },
+  selectFloor, selectApt, enterWalk, exitWalk, goOverview, setHours,
   setView(pos, target) {
     tween = null;
     camera.position.set(...pos);

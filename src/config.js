@@ -19,6 +19,7 @@ export const TREES = { protos: complex.tree_protos ?? [], list: complex.trees ??
 export const CARS = complex.cars ?? [];
 export const PALMS = complex.palms ?? [];
 export const PEOPLE = complex.people ?? [];
+export const LAMPS = complex.lamps ?? [];
 export const PLACES = complex.labels ?? [];
 // block letters as written on the drawings
 export const LETTER = { A: 'А', B: 'Б', V: 'В', G: 'Г', D: 'Д' };

@@ -69,6 +69,7 @@ class Site:
         self.palms = []            # [x, y, z, height, lean, turn]
         self.cars = []             # [x, y, z, heading (plan, from east, ccw), variant, paint?, body?]
         self.people = []           # [x, y, z, k]
+        self.lamps = []            # the lamp heads, lit at night (src/night.js): [x, y, z, aim x, aim y, kind]
         self.lawns = []            # shapely polygons (for planting)
         self.shrub_beds = []       # ... of them, planted with shrubs and small cypresses only
         self.taken = []            # shapely geometries trees must keep clear of
@@ -549,6 +550,7 @@ class Site:
         mb.cylinder(x, y, 0.0, 0.45, 0.12, 'Lamp pole', 8)
         mb.cylinder(x, y, 0.45, 3.4, 0.05, 'Lamp pole', 8)
         mb.lathe([(0.0, 3.4), (0.16, 3.42), (0.2, 3.5), (0.17, 3.85), (0.21, 3.9), (0.08, 4.05), (0.0, 4.08)], 'Lamp white', 10, x, y, 0.0)
+        self.lamps.append([round(x, 2), round(y, 2), 3.7, round(x, 2), round(y, 2), 0])
         self.taken.append(Point(x, y).buffer(1.0))
 
     def street_lamp(self, x, y, heading):
@@ -574,6 +576,8 @@ class Site:
         with mb.at(ex, ey, 0.0, heading):
             mb.box(-0.15, -0.22, ez - 0.16, 0.65, 0.22, ez + 0.02, 'Lamp pole')
             mb.box(-0.1, -0.18, ez - 0.17, 0.6, 0.18, ez - 0.16, 'Lamp white', faces='z')
+        hx, hy = ex + dx * 0.25, ey + dy * 0.25     # the middle of the head
+        self.lamps.append([round(hx, 2), round(hy, 2), round(ez - 0.2, 2), round(hx, 2), round(hy, 2), 1])
         self.taken.append(Point(x, y).buffer(1.5))
 
     def pergola(self, cx, cy, L, W, rot):
