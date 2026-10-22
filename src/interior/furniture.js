@@ -202,14 +202,16 @@ export function nightstand(k, M, w = 0.48, d = 0.4) {
 /** built-in wardrobe, w wide, up to height h */
 export function wardrobe(k, M, w, h) {
   const d = 0.6;
-  k.box(M.lacquer, -w / 2, 0, 0, w / 2, h, d - 0.03);
+  k.box(M.wardrobe, -w / 2, 0, 0, w / 2, h, d - 0.03);
   k.box(M.color(GAP, 0.9), -w / 2 + 0.01, 0.08, d - 0.03, w / 2 - 0.01, h - 0.01, d - 0.021);
   const n = Math.max(2, Math.round(w / 0.5)), fw = w / n;
   for (let i = 0; i < n; i++) {
-    const x0 = -w / 2 + i * fw + 0.002, x1 = x0 + fw - 0.004;
-    k.box(M.lacquer, x0, 0.08, d - 0.02, x1, h - 0.004, d);
-    const hx = i % 2 ? x0 + 0.04 : x1 - 0.04;
-    k.box(M.brass, hx - 0.008, 0.95, d, hx + 0.008, 1.35, d + 0.025);
+    const x0 = -w / 2 + i * fw + 0.003, x1 = x0 + fw - 0.006;
+    k.box(M.wardrobe, x0, 0.08, d - 0.02, x1, h - 0.006, d);
+    // a slim brass pull on two little posts, 6 cm in from the door's opening edge
+    const hx = i % 2 ? x0 + 0.06 : x1 - 0.06;
+    k.box(M.brass, hx - 0.007, 0.98, d + 0.022, hx + 0.007, 1.3, d + 0.034);
+    for (const y of [1.0, 1.28]) k.box(M.brass, hx - 0.005, y - 0.005, d, hx + 0.005, y + 0.005, d + 0.022);
   }
   k.box(M.color(GAP, 0.9), -w / 2, 0, d - 0.06, w / 2, 0.08, d - 0.04);
 }
@@ -228,8 +230,8 @@ export function kitchen(k, M, len, h, windows = [], opt = {}) {
   const fridge = !drawn && len >= 2.8 && !over(len / 2 - 0.62, len / 2);
   const d = opt.d ?? 0.62, top = 0.9;
   const runL = fridge ? len - 0.62 : len, x0 = -len / 2, x1 = x0 + runL;
-  // plinth and base carcass (the fronts' finish; dark only in the gaps between fronts)
-  k.box(M.oak, x0, 0.1, 0, x1, top - 0.03, d - 0.07);
+  // plinth and base carcass (the fronts' finish; dark only in the gaps between fronts); under the
+  // sink only up to its bowl
   k.box(M.color(GAP, 0.9), x0 + 0.01, 0.1, d - 0.07, x1 - 0.01, top - 0.03, d - 0.061);
   k.box(M.color(0x2b2724, 0.9), x0, 0, d - 0.1, x1, 0.1, d - 0.08);
   // the units: [a, b, kind] side by side along the run
@@ -295,6 +297,11 @@ export function kitchen(k, M, len, h, windows = [], opt = {}) {
   // worktop with the sink cut out
   const bowls = drawn ? opt.bowls ?? 1 : 1;
   const sa = sink[0] + 0.06, sb = sink[1] - 0.06, sz0 = 0.08, sz1 = Math.min(0.52, d - 0.1);
+  k.box(M.oak, x0, 0.1, 0, sa, top - 0.03, d - 0.07);
+  k.box(M.oak, sb, 0.1, 0, x1, top - 0.03, d - 0.07);
+  k.box(M.oak, sa, 0.1, 0, sb, top - 0.21, d - 0.07);
+  k.box(M.oak, sa, top - 0.21, 0, sb, top - 0.03, sz0);
+  k.box(M.oak, sa, top - 0.21, sz1, sb, top - 0.03, d - 0.07);
   const T = 0.03, wt = (mat, ax, az, bx, bz) => k.box(mat, ax, top - T, az, bx, top, bz);
   wt(M.quartz, x0, 0, sa, d);
   wt(M.quartz, sb, 0, x1, d);
@@ -372,6 +379,19 @@ export function kitchen(k, M, len, h, windows = [], opt = {}) {
   }
   k.lathe(M.blackGlass, [[0, 0], [0.035, 0], [0.035, 0.2], [0.012, 0.26], [0.012, 0.3], [0, 0.3]], Math.min(sb + 0.2, x1 - 0.06), top, 0.12, 16);
   return [new THREE.Vector3((x0 + x1) / 2, ub - 0.05, ud)];
+}
+
+/** a fridge in a tall housing, w wide, up to the ceiling h (origin at the middle of its back) */
+export function fridgeColumn(k, M, w, h, d = 0.64) {
+  const a = -w / 2, b = w / 2;
+  k.box(M.lacquer, a, 0, 0, b, h, d - 0.03);
+  k.box(M.color(GAP, 0.9), a + 0.01, 0.1, d - 0.03, b - 0.01, h - 0.01, d - 0.021);
+  k.box(M.lacquer, a + 0.002, 0.1, d - 0.02, b - 0.002, 0.86, d);
+  k.box(M.lacquer, a + 0.002, 0.864, d - 0.02, b - 0.002, 2.0, d);
+  k.box(M.lacquer, a + 0.002, 2.004, d - 0.02, b - 0.002, h, d);
+  k.box(M.color(GAP, 0.9), a, 0, d - 0.06, b, 0.1, d - 0.04);
+  k.box(M.blackMetal, b - 0.055, 0.6, d, b - 0.04, 0.84, d + 0.025);
+  k.box(M.blackMetal, b - 0.055, 0.9, d, b - 0.04, 1.35, d + 0.025);
 }
 
 export function chair(k, M) {

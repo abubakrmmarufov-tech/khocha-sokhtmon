@@ -3,6 +3,7 @@
 // in metres, so the grain and weave keep their real size on every piece.
 import * as THREE from 'three';
 import * as T from './textures.js';
+import { houseSet } from '../houseTextures.js';
 
 let M = null;
 
@@ -48,7 +49,9 @@ export function interiorMaterials() {
     skirting: std({ color: 0xf4f2ee, roughness: 0.45 }),
     corridor: std({ color: 0xd2cfc9, roughness: 0.6 }),
     balcony: std({ color: 0xc9c3b9, roughness: 0.8 }),
-    door: std({ color: 0xeeebe5, roughness: 0.42 }),
+    // the interior doors in oak veneer: a white leaf standing open read as a loose board against
+    // the white walls, its handle floating
+    door: std({ map: lightOak.map, color: 0xeee2d0, roughness: 0.45, envMapIntensity: 0.8 }, lightOak.metres),
     entrance: std({ map: walnut.map, roughness: 0.5 }, walnut.metres),
     frame: std({ color: 0x34373b, roughness: 0.38, metalness: 0.6 }),
     sill: std({ color: 0xf2f0ec, roughness: 0.25 }),
@@ -77,6 +80,8 @@ export function interiorMaterials() {
     darkStone: std({ map: dark.map, roughness: 0.2, envMapIntensity: 1 }, dark.metres),
     splash: std({ map: splash.map, roughness: 0.12, envMapIntensity: 1 }, splash.metres),
     lacquer: std({ color: 0xe9e5dd, roughness: 0.35, envMapIntensity: 0.8 }),
+    // the wardrobes: a warm taupe lacquer (in the walls' white they read as part of the wall)
+    wardrobe: std({ color: 0xc9bba7, roughness: 0.38, envMapIntensity: 0.8 }),
     sage: std({ color: 0x8e9a88, roughness: 0.55 }),
     blackMetal: std({ color: 0x1c1d1f, roughness: 0.42, metalness: 0.6 }),
     brass: std({ color: 0xc8a165, roughness: 0.28, metalness: 1 }),
@@ -105,6 +110,12 @@ export function interiorMaterials() {
     rugGrey: std({ map: T.rug('grey').map, roughness: 1, envMapIntensity: 0.4 }),
     art: [0, 1, 2, 3].map((v) => std({ map: T.painting(v), roughness: 0.85 })),
     towel: fabric(0xe9e4da, T.weave('boucle'), 0.5),
+    // the facade's ornamental metal screen over the AC niches (the exterior's 'Lattice grey'): UV u
+    // across the screen, v in screen widths up it
+    lattice: (() => {
+      const set = houseSet('latticeDense');
+      return std({ map: set.map, alphaMap: set.alpha, alphaTest: 0.5, color: 0xb3b7ba, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide, envMapIntensity: 1 });
+    })(),
   };
   M.byColor = new Map();
   M.color = (c, roughness = 0.6) => {
