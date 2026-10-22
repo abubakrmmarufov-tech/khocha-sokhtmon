@@ -21,3 +21,6 @@ client_pictures/
 
 # the client's bug screenshots
 Interior Bugs/
+
+# packages the client sends (QA reports...)
+*.zip

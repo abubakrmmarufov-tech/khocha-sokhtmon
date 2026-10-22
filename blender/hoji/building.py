@@ -1147,25 +1147,34 @@ def build_house(mats, col):
         floors.append(dict(floor=n, z=round(L(n), 3), h=ST, plan='typ'))
     ro = make_object('A roof', build_roof().to_mesh('A roof', mats), col)
     ro['tower'], ro['part'] = 'A', 'roof'
-    # the flats' pick volumes: the viewer picks flats with them and lights the floor under the pointer
-    # (amber, a white outline round each flat). Each is the flat's outline grown out through the
-    # facade to 0.15 m in front of it, so the light shows outside the walls (alibinokor grows its
-    # outlines by 0.2 m; here the walls are deeper); the stair hall's recess stays empty.
+    # the flats' pick volumes: the viewer picks flats with them and lights a floor under the pointer
+    # (amber, a white outline round each flat), so they reach out through the facade to 0.15 m in
+    # front of it. Each is the flat's own outline (`hl`: its rooms; tools/plan/viewer_plans.py) with
+    # the walls round it and the facade in front of it, shared out between the flats by distance:
+    # all of them grown 8 cm at a time in turn, round, so none reaches past its neighbour or into
+    # another's AC niche; clear of the common areas (corridors, stairs, lift) and the stair hall's
+    # recess. (On the open floor the viewer draws the flat itself from `hl`, not these.)
     with open(os.path.join(os.path.dirname(__file__), 'plan.json')) as f:
         plan = json.load(f)
-    outs = [Polygon(a['outline']).buffer(0) for a in plan['apartments']]
+    own = [Polygon(a.get('hl') or a['outline']).buffer(0) for a in plan['apartments']]
+    common = unary_union([Polygon(c).buffer(0) for c in plan['common']]).buffer(0.05, join_style='mitre')
     core = [z for z in NORTH if z['kind'] == 'core'][0]
     void = sbox(X1 - core['u1'], Y1 - CORE_D, X1 - core['u0'], Y1 + 1)
     for key, n0, ns in (('typ', FIRST, range(FIRST, TOP)), ('top', TOP, [TOP])):
         shell = outline(n0).buffer(0.15, join_style='mitre')
-        band = shell.difference(outline(n0).buffer(-0.9, join_style='mitre')).difference(void)
-        given = Polygon()
-        for i, o in enumerate(outs):
-            g = unary_union([o, o.buffer(1.5, join_style='mitre').intersection(band)]).intersection(shell)
-            g = g.difference(unary_union([q for j, q in enumerate(outs) if j != i])).difference(given).buffer(0)
-            given = given.union(g)
+        free = shell.difference(void).difference(common).difference(unary_union(own))
+        mine = [o.intersection(shell) for o in own]
+        for step in range(14):
+            for i in range(len(mine)):
+                g = mine[i].buffer(0.08, quad_segs=2).intersection(free)
+                if g.is_empty:
+                    continue
+                mine[i] = mine[i].union(g)
+                free = free.difference(g)
+        for i, g in enumerate(mine):
+            g = g.buffer(0.01, join_style='mitre').buffer(-0.01, join_style='mitre').simplify(0.03)
             mb = MeshBuilder()
-            for part in getattr(g.simplify(0.02), 'geoms', [g.simplify(0.02)]):
+            for part in getattr(g, 'geoms', [g]):
                 if part.area > 0.05:
                     mb.prism(list(part.exterior.coords)[:-1], -0.15, ST - 0.1, 'Pick', 'Pick', 'Pick')
             me = mb.to_mesh(f'pick {key} {i}', mats)

@@ -17,7 +17,9 @@ export function planTransform(apt, cw, ch, pad) {
   return { s, px: (x) => ox + (x - b.x0) * s, py: (y) => oy + (b.y1 - y) * s, b };
 }
 
-export function drawPlan(canvas, apt, { pad = 14, labels = true, text = 1 } = {}) {
+// keep: a corner of the canvas the labels must leave free (the zoom button over it): { w, h } from
+// its top right
+export function drawPlan(canvas, apt, { pad = 14, labels = true, text = 1, keep = null } = {}) {
   const dpr = Math.min(devicePixelRatio || 1, 2);
   const cw = canvas.clientWidth || canvas.width, ch = canvas.clientHeight || canvas.height;
   canvas.width = Math.round(cw * dpr);
@@ -79,7 +81,7 @@ export function drawPlan(canvas, apt, { pad = 14, labels = true, text = 1 } = {}
   g.lineWidth = 2;
   g.stroke();
 
-  if (labels) T.labels = drawLabels(g, T, [...apt.data.rooms, ...apt.data.balconies], cw, ch, text);
+  if (labels) T.labels = drawLabels(g, T, [...apt.data.rooms, ...apt.data.balconies], cw, ch, text, keep);
   return T;
 }
 
@@ -146,8 +148,8 @@ function boxInside(poly, c, w, h) {
   return true;
 }
 
-function drawLabels(g, T, rooms, cw, ch, k = 1) {
-  const placed = [], skipped = [];
+function drawLabels(g, T, rooms, cw, ch, k = 1, keep = null) {
+  const placed = keep ? [{ x0: cw - keep.w, y0: 0, x1: cw, y1: keep.h }] : [], skipped = [];
   const clash = (q) => placed.some((p) => q.x0 < p.x1 + 2 && q.x1 > p.x0 - 2 && q.y0 < p.y1 + 2 && q.y1 > p.y0 - 2);
   const onCanvas = (q) => q.x0 >= 1 && q.y0 >= 1 && q.x1 <= cw - 1 && q.y1 <= ch - 1;
   const list = rooms.filter((r) => r.area >= 1.2).sort((a, b) => b.area - a.area);
@@ -187,6 +189,7 @@ function drawLabels(g, T, rooms, cw, ch, k = 1) {
   g.lineWidth = 3 * Math.min(k, 1.5);
   g.strokeStyle = 'rgba(255, 255, 255, 0.88)';
   for (const p of placed) {
+    if (!p.v) continue; // (the corner kept free)
     const { v, c } = p, lh = v.lh;
     g.save();
     g.translate(c.x, c.y);
@@ -209,7 +212,7 @@ function drawLabels(g, T, rooms, cw, ch, k = 1) {
     }
     g.restore();
   }
-  return { placed: placed.map(({ x0, y0, x1, y1, room, rot, v }) => ({ x0, y0, x1, y1, room, rot, size: v.size, small: v.small, area: !!v.area })), skipped };
+  return { placed: placed.filter((p) => p.v).map(({ x0, y0, x1, y1, room, rot, v }) => ({ x0, y0, x1, y1, room, rot, size: v.size, small: v.small, area: !!v.area })), skipped };
 }
 
 // ---------- furniture symbols (outlines in plan metres, like the drawing) ----------

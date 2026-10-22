@@ -67,8 +67,9 @@ const RU = {
   kg: 'кг',
   summary: { living: 'гостиная', kitchen: 'кухня', bedroom: ['спальня', 'спальни', 'спален'], bath: ['санузел', 'санузла', 'санузлов'], loggia: 'лоджия', terrace: 'терраса', storage: 'гардероб' },
   hideUi: 'Скрыть панели — останется только вид',
+  slowHint: 'Если 3D работает медленно, переключите графику на лёгкую (кнопка в правом нижнем углу).',
   showUi: 'Показать панели',
-  room: { 'Living room': 'Гостиная', Kitchen: 'Кухня', Bedroom: 'Спальня', Bathroom: 'Ванная', WC: 'Санузел', Hall: 'Прихожая', Wardrobe: 'Гардероб', Loggia: 'Лоджия', Terrace: 'Терраса', Balcony: 'Балкон', 'Guest room': 'Гостевая', 'Common room': 'Общая комната', 'AC niche': 'Место для кондиционера' },
+  room: { 'Living room': 'Гостиная', Kitchen: 'Кухня', Bedroom: 'Спальня', Bathroom: 'Ванная', WC: 'Санузел', Hall: 'Прихожая', Wardrobe: 'Гардероб', Loggia: 'Лоджия', Terrace: 'Терраса', Balcony: 'Балкон', 'Guest room': 'Гостевая', 'Common room': 'Общая комната', 'AC niche': 'Кондиционер' },
   lang: 'RU',
 };
 
@@ -130,8 +131,9 @@ const TJ = {
   kg: 'кг',
   summary: { living: 'меҳмонхона', kitchen: 'ошхона', bedroom: ['хонаи хоб', 'хонаи хоб', 'хонаи хоб'], bath: ['ҳаммом', 'ҳаммом', 'ҳаммом'], loggia: 'айвон', terrace: 'терраса', storage: 'либосхона' },
   hideUi: 'Пинҳон кардани панелҳо — танҳо манзара мемонад',
+  slowHint: 'Агар 3D суст кор кунад, графикаро ба сабук гузаронед (тугма дар кунҷи рости поён).',
   showUi: 'Нишон додани панелҳо',
-  room: { 'Living room': 'Меҳмонхона', Kitchen: 'Ошхона', Bedroom: 'Хонаи хоб', Bathroom: 'Ҳаммом', WC: 'Ҳоҷатхона', Hall: 'Даҳлез', Wardrobe: 'Либосхона', Loggia: 'Айвон', Terrace: 'Терраса', Balcony: 'Балкон', 'Guest room': 'Меҳмонхона', 'Common room': 'Ҳуҷраи умумӣ', 'AC niche': 'Ҷои кондитсионер' },
+  room: { 'Living room': 'Меҳмонхона', Kitchen: 'Ошхона', Bedroom: 'Хонаи хоб', Bathroom: 'Ҳаммом', WC: 'Ҳоҷатхона', Hall: 'Даҳлез', Wardrobe: 'Либосхона', Loggia: 'Айвон', Terrace: 'Терраса', Balcony: 'Балкон', 'Guest room': 'Меҳмонхона', 'Common room': 'Ҳуҷраи умумӣ', 'AC niche': 'Кондитсионер' },
   lang: 'TJ',
 };
 

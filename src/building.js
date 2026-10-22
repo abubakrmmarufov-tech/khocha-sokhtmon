@@ -87,21 +87,32 @@ export async function loadComplex(apartments, renderer, onProgress) {
     edges.renderOrder = 11;
     edges.visible = false;
     mesh.add(edges);
-    // the flat's outline on its floor (for the plan of the open floor): the bottom edges, raised a little
-    const pos = eg.attributes.position.array;
-    let y0 = Infinity;
-    for (let i = 1; i < pos.length; i += 3) y0 = Math.min(y0, pos[i]);
-    const flat = [];
-    for (let i = 0; i < pos.length; i += 6) {
-      if (pos[i + 1] < y0 + 0.01 && pos[i + 4] < y0 + 0.01) flat.push(pos[i], y0 + 0.08, pos[i + 2], pos[i + 3], y0 + 0.08, pos[i + 5]);
+    // the flat itself on the open floor, from its own outline (data.hl: its rooms; the pick volume
+    // reaches out through the facade and stands a storey high, over the cut walls): a tint on its
+    // floor and a line round it. In the model's frame (plan x, height, -plan y: the root stands at
+    // the plan's origin), at the floor's height (not the pick volume's frame: its positions are
+    // quantized, the node's transform scales them back)
+    const hl = apt.data.hl ?? apt.data.outline;
+    const shape = new THREE.Shape(hl.map(([x, y]) => new THREE.Vector2(x, y)));
+    const tint = new THREE.Mesh(
+      new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2).translate(0, 0.03, 0),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    const segs = [];
+    hl.forEach(([x, y], i) => {
+      const [x2, y2] = hl[(i + 1) % hl.length];
+      segs.push(x, 0.08, -y, x2, 0.08, -y2);
+    });
+    const ring = new LineSegments2(new LineSegmentsGeometry().setPositions(segs), OUTLINE.open);
+    for (const o of [tint, ring]) {
+      o.position.set(0, apt.baseY - root.position.y, 0);
+      o.renderOrder = o === ring ? 11 : 10;
+      o.visible = false;
+      root.add(o);
     }
-    const ring = new LineSegments2(new LineSegmentsGeometry().setPositions(flat), OUTLINE.open);
-    ring.renderOrder = 11;
-    ring.visible = false;
-    mesh.add(ring);
     box.setFromObject(mesh);
     const c = box.getCenter(new THREE.Vector3());
-    units.set(apt.id, { overlay: mesh, edges, ring, center: new THREE.Vector3(c.x, apt.baseY, c.z), top: box.max.y });
+    units.set(apt.id, { overlay: mesh, edges, ring, tint, center: new THREE.Vector3(c.x, apt.baseY, c.z), top: box.max.y });
   }
 
   // Floors that share a mesh (the typical floors: same plan, same height) are drawn as one instanced

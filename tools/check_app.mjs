@@ -46,7 +46,8 @@ for (const [tower, floor] of [['A', 3], ['A', 6], ['A', 9], ['A', 10]]) {
     app.selectFloor(tower, floor);
     await new Promise((r) => setTimeout(r, 1300));
     const apts = app.apartments.filter((a) => a.tower === tower && a.floor === floor);
-    const shown = apts.filter((a) => app.building.units.get(a.id).overlay.visible).length;
+    // (on the open floor a flat is drawn as a tint on its floor; from outside, by its pick volume)
+    const shown = apts.filter((a) => { const u = app.building.units.get(a.id); return u.overlay.visible || u.tint?.visible; }).length;
     const a = apts[1];
     app.selectApt(a);
     await new Promise((r) => setTimeout(r, 1300));

@@ -406,12 +406,31 @@ export function buildFloor(towerKey, floor, apts, walk = null) {
     };
     // wall on both sides; else (a door in a corner) on one side; else the band given; else the
     // gap between this room and the one across
-    let got = scan((s) => side(r.a, 1, s) && side(r.b, -1, s)) ?? scan((s) => side(r.a, 1, s) || side(r.b, -1, s)) ?? band;
+    const both = (s) => side(r.a, 1, s) && side(r.b, -1, s), either = (s) => side(r.a, 1, s) || side(r.b, -1, s);
+    let test = both, got = scan(both);
+    if (!got) [test, got] = [either, scan(either)];
+    if (!got) [test, got] = [null, band];
     if (!got && depth > 0.06) got = [-depth + 0.02, 0];
     if (!got) return null;
     let [s0, s1] = got;
-    s0 -= 0.005;
-    s1 += 0.005;
+    if (test) {
+      // the walls' faces to the millimetre (the scan steps 1 cm): the wall over the doorway 1 mm
+      // inside them, flush to the eye (5 mm proud, its ends showed as lines down from the ceiling)
+      const face = (s, dir) => {
+        let lo = s, hi = s + dir * 0.011;
+        for (let it = 0; it < 8; it++) {
+          const m = (lo + hi) / 2;
+          if (test(m)) lo = m;
+          else hi = m;
+        }
+        return lo;
+      };
+      s0 = face(s0, -1) + 0.001;
+      s1 = face(s1, 1) - 0.001;
+    } else {
+      s0 -= 0.005;
+      s1 += 0.005;
+    }
     const mx = mx0, my = my0, sm = (s0 + s1) / 2;
     const behind = roomsAt.at(mx + r.n[0] * (s0 - 0.15), my + r.n[1] * (s0 - 0.15)) ?? across;
     const entrance = !behind || behind.kind === 'common' || (behind.kind === 'room' && behind.data.apt !== apt);
@@ -428,8 +447,20 @@ export function buildFloor(towerKey, floor, apts, walk = null) {
     const seen = (list) => list.some((c) => dist(c, centre) < 0.45);
     if (!seen(doors)) {
       doors.push(centre);
-      // (2 cm into the walls on either side: no hairline at its ends)
-      slab(k, M.wall, shift(r.a, s0), shift(r.b, s0), r.n, 0, s1 - s0, DOOR_H, H, 0.02);
+      // the wall over the doorway, from jamb to jamb and 2 cm into the walls beside it: the jambs
+      // found to the 2 mm (the run's ends come from 5 cm samples: the wall over the door stopped
+      // short of the walls beside it, a dark slot down from the ceiling at each end)
+      // (probed at both faces and the middle: the drawn jambs step, a doorway can be a few cm wider
+      // on one side - the widest is taken, the rest of the wall over it lies inside the walls)
+      const at = (t, d) => [r.a[0] + r.u[0] * t + r.n[0] * d, r.a[1] + r.u[1] * t + r.n[1] * d];
+      const jamb = (t0, dir, d) => {
+        for (let t = t0; Math.abs(t - t0) < 0.3; t += dir * 0.002) if (solidKind(at(t, d))) return t;
+        return t0 + dir * 0.1;
+      };
+      const depths = [s0 + 0.008, sm, s1 - 0.008];
+      const ta = Math.min(...depths.map((d) => jamb(0.1, -1, d))), tb = Math.max(...depths.map((d) => jamb(r.len - 0.1, 1, d)));
+      const A = [r.a[0] + r.u[0] * ta, r.a[1] + r.u[1] * ta], B = [r.a[0] + r.u[0] * tb, r.a[1] + r.u[1] * tb];
+      slab(k, M.wall, shift(A, s0), shift(B, s0), r.n, 0, s1 - s0, DOOR_H, H, 0.02);
     }
     if (seen(leaves)) return [s0, s1];
     const otherRoom = across.kind === 'room' ? across.data.room : null;

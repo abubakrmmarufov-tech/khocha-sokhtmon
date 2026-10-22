@@ -95,8 +95,10 @@ const controls = new OrbitControls(camera, canvas);
 controls.target.copy(home().target);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.minDistance = 12;
-controls.maxDistance = 420;
+// (not into the house: 20 m from the middle of the house or the open floor; not so far out that the
+// edge of the modelled city shows)
+controls.minDistance = 20;
+controls.maxDistance = 260;
 controls.maxPolarAngle = Math.PI * 0.48;
 controls.autoRotate = false;
 controls.autoRotateSpeed = 0.3;
@@ -201,7 +203,7 @@ function updateOverlays() {
   for (const a of apartments) {
     const u = building.units.get(a.id);
     if (!u) continue;
-    let show = false, color = 0xffffff, op = 0, edges = null;
+    let show = false, color = 0xffffff, op = 0, edges = null, onFloor = false;
     const hoverFloor = sameFloor(state.hoverFloor, a);
     if (state.mode === 'overview') {
       if (hoverFloor) {
@@ -214,22 +216,25 @@ function updateOverlays() {
       if (isOpen(a)) {
         // the flats of the open floor: a light outline each; the one under the pointer (or chosen)
         // lit up in amber with a thick outline drawn over the walls and furniture
+        // (drawn on its floor: a tint and its outline, not the storey-high pick volume)
         const lit = a === state.apt || a === state.hoverApt;
-        show = true; color = lit ? 0xffa42b : ACCENT;
+        show = true; onFloor = true; color = lit ? 0xffa42b : ACCENT;
         edges = a === state.apt ? OUTLINE.chosen : a === state.hoverApt ? OUTLINE.hover : OUTLINE.open;
-        op = a === state.apt ? 0.48 : a === state.hoverApt ? 0.44 : 0.06;
+        op = a === state.apt ? 0.42 : a === state.hoverApt ? 0.36 : 0.06;
         if (filterActive() && !matches(a)) [op, edges] = [0.0, null];
       } else if (hoverFloor && a.floor < state.floor) {
         // (a floor above the open one is cut away: nothing to light)
         show = true; op = 0.35;
       }
     }
-    u.overlay.visible = show;
-    u.overlay.material.color.setHex(color);
-    u.overlay.material.opacity = op;
+    const fill = onFloor ? u.tint : u.overlay;
+    (onFloor ? u.overlay : u.tint).visible = false;
+    fill.visible = show;
+    fill.material.color.setHex(color);
+    fill.material.opacity = op;
     // a floor seen from outside: the outline of every flat's volume; the open floor: each flat's
-    // outline on the floor plan
-    const line = state.mode === 'floor' ? u.ring : u.edges;
+    // outline on its floor
+    const line = onFloor ? u.ring : u.edges;
     (line === u.ring ? u.edges : u.ring).visible = false;
     line.visible = show && !!edges;
     if (edges) line.material = edges;
@@ -422,7 +427,7 @@ function renderSide() {
       </div>`;
     const cv = side.querySelector('.plan');
     cv.style.height = `${planHeight(a, cv.clientWidth)}px`;
-    drawPlan(cv, a);
+    drawPlan(cv, a, { keep: { w: 44, h: 44 } }); // (clear of the zoom button in its corner)
     cv.onclick = () => openPlan(a);
   }
 }
@@ -487,12 +492,12 @@ function refresh() {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms = 3000) {
   const t = $('#toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+  toastTimer = setTimeout(() => t.classList.remove('show'), ms);
 }
 
 function setHover(a) {
@@ -862,6 +867,30 @@ addEventListener('resize', () => {
 // squarely, from 22 degrees round on the far side from the other visible face; when the view turns
 // past a corner it swings round to the next facade in about a second.
 let sunAz = null;
+// The camera stays out of the house and above the ground: zooming in on a corner, panning or a low
+// orbit would take it through the walls into the hollow floors. (With a floor open, the house above
+// it is hidden: only up to the open floor's walls.)
+const HOUSE_BOX = (() => {
+  const xs = HOUSE.outline.map((p) => p[0]), ys = HOUSE.outline.map((p) => p[1]);
+  const a = toScene(Math.min(...xs), Math.min(...ys)), b = toScene(Math.max(...xs), Math.max(...ys));
+  const m = 1.2;
+  return { x0: Math.min(a.x, b.x) - m, x1: Math.max(a.x, b.x) + m, z0: Math.min(a.z, b.z) - m, z1: Math.max(a.z, b.z) + m };
+})();
+function keepOutside() {
+  const c = camera.position;
+  if (c.y < 1.8) c.y = 1.8;
+  const top = state.mode === 'floor' ? (HOUSE.floors.find((f) => f.floor === state.floor)?.z ?? 0) + 4 : HOUSE.top + 1;
+  const B = HOUSE_BOX;
+  if (c.x <= B.x0 || c.x >= B.x1 || c.z <= B.z0 || c.z >= B.z1 || c.y >= top) return;
+  // out by the nearest face
+  const d = [[c.x - B.x0, 'x0'], [B.x1 - c.x, 'x1'], [c.z - B.z0, 'z0'], [B.z1 - c.z, 'z1'], [top - c.y, 'top']].sort((p, q) => p[0] - q[0])[0][1];
+  if (d === 'x0') c.x = B.x0;
+  else if (d === 'x1') c.x = B.x1;
+  else if (d === 'z0') c.z = B.z0;
+  else if (d === 'z1') c.z = B.z1;
+  else c.y = top;
+}
+
 function followSun(dt) {
   const dx = camera.position.x - controls.target.x, dy = -(camera.position.z - controls.target.z);
   if (Math.hypot(dx, dy) < 1) return;
@@ -901,8 +930,10 @@ renderer.setAnimationLoop(() => {
     drawMinimap();
   } else {
     controls.autoRotate = state.mode === 'overview' && performance.now() - lastInteraction > 25000;
-    if (!tween) controls.update();
-    else camera.lookAt(controls.target);
+    if (!tween) {
+      controls.update();
+      keepOutside();
+    } else camera.lookAt(controls.target);
     if (building) updateLabels();
   }
   for (const n of water) n.offset.x += dt * 0.006, n.offset.y += dt * 0.004;
@@ -913,7 +944,41 @@ renderer.setAnimationLoop(() => {
     shadowFrames--;
   }
   pipeline.render(dt);
+  watchFrames();
 });
+
+// High graphics on a slower computer (a Retina laptop renders four times the pixels at twice the
+// pixel ratio, 4x multisampled, with ambient occlusion): once the model is in and the shaders are
+// compiled, the frame times are watched over 3-second stretches of a visible page; while they are
+// slow (under ~28 fps) the pixel ratio steps down to 1. Still slow at 1: the light level is offered.
+let watch = null;
+function watchFrames() {
+  if (Q.level !== 'high' || !building || document.hidden) {
+    watch = null;
+    return;
+  }
+  const now = performance.now();
+  if (!watch) {
+    watch = { t0: now + 4000, n: 0, offered: watch?.offered };
+    return;
+  }
+  if (now < watch.t0) return;
+  watch.n++;
+  if (now - watch.t0 < 3000) return;
+  const fps = (watch.n * 1000) / (now - watch.t0);
+  watch.t0 = now;
+  watch.n = 0;
+  if (fps >= 28) return;
+  const pr = renderer.getPixelRatio();
+  if (pr > 1.01) {
+    renderer.setPixelRatio(Math.max(1, pr - 0.5));
+    pipeline.setSize(innerWidth, innerHeight);
+    shadowsDirty();
+  } else if (!watch.offered) {
+    watch.offered = true;
+    toast(L().slowHint, 7000);
+  }
+}
 
 refresh();
 frameCentre();
