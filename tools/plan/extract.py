@@ -200,6 +200,7 @@ def extract():
         draw([[d['c'], d['e']]], 3)
     # the sheet's frame and the dimension lines lie outside the floor: drop what is far out
     img[:, :int(0.15 * R)] = 0
+    img[:, -int(0.15 * R):] = 0
     # flood the outside
     ff = img.copy()
     mask = np.zeros((HPX + 2, WPX + 2), np.uint8)

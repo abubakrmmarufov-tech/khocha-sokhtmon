@@ -2,10 +2,10 @@
 metres. The sheet is stored rotated (page rotation 270); the drawing's own coordinates are used.
 
 Plan frame (the house's, blender/hoji/building.py): x east, y north, the centre of the axis grid at
-the origin. The sheet's top is the back (the stair and its open loggia) and its left the EAST end:
-the renders (cameras in tools/cams.json) put the stair hall's recess 15.2 m from the east end, the
-sheet 15.3 m from its left edge - the sheet is drawn mirrored to the renders, and the model follows
-the renders.
+the origin. The sheet's top is the back (the stair and its open loggia), its left the WEST end: the
+model follows the plans as drawn (the user, 2026-10-23: the flats as on the plans). The renders are
+drawn mirrored to them (they put the stair hall's recess 15.2 m from the east end, the sheet 15.3 m
+from the west); the back's render measurements are turned round to match (building.py).
 """
 import os
 
@@ -24,7 +24,7 @@ XC = (AX_SHORT[0] + AX_SHORT[1]) / 2
 
 def to_plan(px, py):
     """drawing point (pt) -> plan (m)"""
-    return ((YC - py) / K, (px - XC) / K)
+    return ((py - YC) / K, (px - XC) / K)
 
 
 def colour(c):

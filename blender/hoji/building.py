@@ -68,10 +68,15 @@ TERR_X = {'S': 3.45, 'N': 3.3}
 TERR_Y = {'S': 6.55, 'N': 7.05}
 SET = 0.5                  # the top floor's ends between the terraces stand back this much
 SLOT_D = 0.12              # the ornamental strips' slots (render 8: the strip beside the middle block shows)
-# the back's middle (renders 3 and 7, triangulated): the stair hall's recess; in it a column of the
-# stair's small windows standing 0.8 m out of the recess's back wall
+# The back is measured on renders 3 and 7, which are drawn mirrored to the architect's plans (the
+# stair hall east of the middle, on the plans west of it): the model follows the plans (the user,
+# 2026-10-23), so what the renders give along the back, from their east end, is taken from the west
+# end here (W - u: the stair hall's recess and its windows, the podium's back windows and door, the
+# stair house on the roof).
+# the back's middle: the stair hall's recess; in it a column of the stair's small windows standing
+# 0.8 m out of the recess's back wall
 CORE_D = 1.9
-STAIR_COL = (14.91, 15.59, 1.1)        # u0, u1, the depth of its face
+STAIR_COL = (W - 15.59, W - 14.91, 1.1)    # u0, u1, the depth of its face
 # The podium is narrower than the floors over it, front and back: the ground floor's plan has its
 # walls on the outer column lines (axes А and Г, 17.6 m apart) while the floors over it reach 1.7 m
 # (2.2 m at the forward blocks) out at the front and 2.15 m at the back. The renders agree:
@@ -83,12 +88,12 @@ POD_BACK = 8.85                        # plan y of the podium's back wall
 POD_FRONT = -8.85                      # ... of its shop front (the glass; the piers stand out of it)
 SOFFIT = P - 0.9                       # the overhang's underside (the foot of its band)
 SHADE_Z = 6.5                          # the wall under it in its shade from here up (renders 3, 7)
-BACK_WINS = (2.61, 5.61, 8.98, 11.63, 15.14, 18.38, 21.62, 24.58, 28.27, 31.34)   # centres, u from the east end
+BACK_WINS = tuple(sorted(W - c for c in (2.61, 5.61, 8.98, 11.63, 15.14, 18.38, 21.62, 24.58, 28.27, 31.34)))   # centres
 WIN_Z = (3.92, 4.72)                   # the small windows
 SLIT_Z = (7.55, 8.0)                   # the narrow lights over them
 WIN_W = 1.45
 # the back door under the window over the stair hall's recess (render 7: a metal door up a white stoop)
-DOOR = (14.52, 15.91, 0.87, 3.5)       # u0, u1, z0, z1
+DOOR = (W - 15.91, W - 14.52, 0.87, 3.5)   # u0, u1, z0, z1
 
 # window heights over their floor
 BIG_Z = (0.24, 2.55)       # risalits (opening)
@@ -111,14 +116,21 @@ def Z(kind, u0, u1, out=0.0, **kw):
     return dict(kind=kind, u0=u0, u1=u1, out=out, **kw)
 
 
-def mirror(zones, L_):
-    right = []
+def flip(zones, L_):
+    """a face's zones taken from its other end (u -> L_ - u)"""
+    out = []
     for z in reversed(zones):
         m = dict(z)
         m['u0'], m['u1'] = L_ - z['u1'], L_ - z['u0']
         if 'wins' in z:
             m['wins'] = [(L_ - b, L_ - a) for a, b in reversed(z['wins'])]
-        right.append(m)
+        out.append(m)
+    return out
+
+
+def mirror(zones, L_):
+    """the zones and their mirror image from the face's other end, meeting in the middle"""
+    right = flip(zones, L_)
     if zones[-1]['kind'] == right[0]['kind'] and abs(zones[-1]['u1'] - right[0]['u0']) < 1e-6:
         mid = dict(zones[-1])
         mid['u1'] = right[0]['u1']
@@ -147,8 +159,8 @@ SOUTH = mirror([
 ], W)
 
 # the back: the sketch's windows (the renders show them all 1.4 m wide); the strips and the stair
-# hall's recess triangulated on renders 3 and 7
-NORTH = [
+# hall's recess triangulated on renders 3 and 7 (as the renders have them, from the east end: flipped)
+NORTH = flip([
     Z('rustic', 0.00, 1.43, corner=True),
     Z('column', 1.43, 3.00, corner=True),
     Z('wall', 3.00, 12.95, wins=wins(5.27, 8.73, 11.50)),
@@ -160,7 +172,7 @@ NORTH = [
     Z('wall', 17.45, 31.00, wins=wins(18.95, 21.85, 24.85, 28.73)),
     Z('column', 31.00, 32.57, corner=True),
     Z('rustic', 32.57, 34.00, corner=True),
-]
+], W)
 
 # the ends, from the front (E) / from the back (W): strips at both corners (the corner flats' AC
 # niches behind them), the big framed panel between
@@ -761,26 +773,29 @@ def build_roof():
         mb.cap(ring, zt_a, 'Roof deck')
         balustrade_along(mb, ring + ring[:1], zt_a, inset=0.28, spacing=2.2, closed=True, post_h=1.32)
     # --- the stair house over the stair hall (renders 1, 2, 3, 7; triangulated on 3 and 7: its north
-    # face over the recess's back wall) ---
+    # face over the recess's back wall); built as the renders have it, east of the middle, and
+    # mirrored over the plans' stair hall west of it ---
+    sh = MeshBuilder()
     hx0, hx1 = -0.4, 3.5
     hy0, hy1 = -0.8, Y1 - CORE_D
     ring = rect_ring(hx0, hy0, hx1, hy1)
-    mb.prism(ring, DECK - 0.05, BLOCK_TOP, 'Facade white', None)
+    sh.prism(ring, DECK - 0.05, BLOCK_TOP, 'Facade white', None)
     bc = F.scaled(F.CORNICE_TERRACE, 0.5)
-    mb.sweep([(x, y, BLOCK_TOP) for x, y in ring], bc, 'Stone white')
+    sh.sweep([(x, y, BLOCK_TOP) for x, y in ring], bc, 'Stone white')
     zt = BLOCK_TOP + bc[-1][1]
-    mb.cap(ring, zt, 'Roof deck')
-    balustrade_along(mb, ring + ring[:1], zt, inset=0.22, spacing=1.9, closed=True)
-    # its windows and the door to the roof (west face), a window on the north face
-    with mb.at(hx0, hy1, 0.0, -math.pi / 2):
+    sh.cap(ring, zt, 'Roof deck')
+    balustrade_along(sh, ring + ring[:1], zt, inset=0.22, spacing=1.9, closed=True)
+    # its windows and the door to the roof (the face towards the middle), a window on the north face
+    with sh.at(hx0, hy1, 0.0, -math.pi / 2):
         for u0_, w_, kind in ((1.2, 0.9, 'door'), (4.0, 1.0, 'win'), (6.6, 1.0, 'win')):
             c = DECK + (0.1 if kind == 'door' else 0.95)
             e = DECK + 2.4
-            F.window(mb, u0_, u0_ + w_, c, e, 0.0, 'narrow', depth=0.16)
-            F.surround(mb, u0_, u0_ + w_, c, e, 0.0, w=0.1, out=0.03, mat='Sill white', sill=kind != 'door')
-    with mb.at(hx1, hy1, 0.0, math.pi):
-        F.window(mb, 1.5, 2.6, DECK + 0.95, DECK + 2.4, 0.0, 'narrow', depth=0.16)
-        F.surround(mb, 1.5, 2.6, DECK + 0.95, DECK + 2.4, 0.0, w=0.1, out=0.03, mat='Sill white')
+            F.window(sh, u0_, u0_ + w_, c, e, 0.0, 'narrow', depth=0.16)
+            F.surround(sh, u0_, u0_ + w_, c, e, 0.0, w=0.1, out=0.03, mat='Sill white', sill=kind != 'door')
+    with sh.at(hx1, hy1, 0.0, math.pi):
+        F.window(sh, 1.5, 2.6, DECK + 0.95, DECK + 2.4, 0.0, 'narrow', depth=0.16)
+        F.surround(sh, 1.5, 2.6, DECK + 0.95, DECK + 2.4, 0.0, w=0.1, out=0.03, mat='Sill white')
+    mb.merge(sh.mirrored_x())
     return mb
 
 

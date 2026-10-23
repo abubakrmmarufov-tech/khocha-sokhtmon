@@ -396,9 +396,10 @@ class Site:
     def back(self):
         mb, rnd = self.mb, self.rnd
         # (render 3, measured with its camera) along the podium's back wall a lawn strip in the shadow of
-        # the floors over it, open at the back door's steps; at the ends likewise
+        # the floors over it, open at the back door's steps (west of the middle, as the plans have the
+        # stair hall: blender/hoji/building.py DOOR); at the ends likewise
         wb = 8.85                      # the podium's back wall (blender/hoji/building.py POD_BACK)
-        for g in (sbox(-17.0, wb, 0.55, 9.6), sbox(3.05, wb, 17.0, 9.6),
+        for g in (sbox(-17.0, wb, -3.05, 9.6), sbox(-0.55, wb, 17.0, 9.6),
                   sbox(-18.25, -9.25, -17.06, 9.6), sbox(17.06, -9.25, 18.25, 9.6)):
             self.lawn(g, hedge=False, flowers=None, raised=0.06, plant=False)
         # a paved lane; the parking: one grey pad, no lines, the cars backed in across it (dark, white,

@@ -196,6 +196,13 @@ class MeshBuilder:
         for idx, mat, sm, uvs in other.faces:
             self.faces.append(([i + off for i in idx], mat, sm, uvs))
 
+    def mirrored_x(self):
+        """the same geometry mirrored east-west (x -> -x), its faces turned so they still face out"""
+        out = MeshBuilder()
+        out.verts = [(-x, y, z) for x, y, z in self.verts]
+        out.faces = [(idx[::-1], mat, sm, uvs[::-1] if uvs else None) for idx, mat, sm, uvs in self.faces]
+        return out
+
     def to_mesh(self, name, mats):
         """mats: name -> bpy material. Box-projected UVs in metres where a face gives none."""
         me = bpy.data.meshes.new(name)
