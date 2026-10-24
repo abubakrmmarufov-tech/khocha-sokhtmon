@@ -251,14 +251,14 @@ function updateOverlays() {
     if (!u) continue;
     let show = false, color = 0xffffff, op = 0, edges = null, onFloor = false;
     const hoverFloor = sameFloor(state.hoverFloor, a);
-    // a flat that is sold or reserved stays red (yellow) on the building, whatever else is lit
+    // sold flats show red and reserved ones yellow once their floor is pointed at or opened; the
+    // building as it first appears stays as on the renders
     const taken = TAKEN[statusOf(a)];
     if (state.mode === 'overview') {
       if (hoverFloor) {
-        // the floor under the pointer: amber on the white stone, with a white outline round every flat
+        // the floor under the pointer: amber on the white stone for the free flats, red / yellow for
+        // the sold / reserved ones, with a white outline round every flat
         show = true; op = taken ? 0.72 : 0.62; edges = OUTLINE.floor; color = taken ?? 0xffa42b;
-      } else if (taken) {
-        show = true; color = taken; op = 0.55;
       } else if (filterActive() && matches(a)) {
         show = true; color = ACCENT; op = 0.55;
       }

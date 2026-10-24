@@ -1,6 +1,7 @@
 // The 3D site with the sales CRM's statuses: opens the CRM's demo (it fills the example and hands the
-// statuses over in this browser), then the site, and checks that sold flats are red and reserved
-// ones yellow on the building, the floor list, the open floor and the flat card; screenshots.
+// statuses over in this browser), then the site, and checks that the building is not coloured at
+// first, that a floor under the pointer shows its sold flats red, reserved ones yellow and free ones
+// amber, and the floor list, the open floor and the flat card; screenshots.
 // Needs the built site with the CRM, served from one origin:
 //   npm run build && npx vite preview --port 5192
 //   node tools/sales_check.mjs [OUT=build/sales] [URL=http://localhost:5192/]
@@ -58,7 +59,8 @@ for (const [tag, vp, mobile] of [['desk', { width: 1440, height: 900 }, false], 
   await page.goto(`${URL}?still`);
   await page.waitForFunction(() => window.__app?.building, null, { timeout: 120000 });
   await page.waitForTimeout(4500);
-  const shown = await page.evaluate(() => {
+  // the colour of each flat's box on the building (null: not shown)
+  const shown = () => page.evaluate(() => {
     const a = window.__app;
     const out = {};
     for (const apt of a.apartments) {
@@ -67,16 +69,33 @@ for (const [tag, vp, mobile] of [['desk', { width: 1440, height: 900 }, false], 
     }
     return out;
   });
-  ok(sold.every((id) => shown[id] === '#e5392f'), `${tag} overview: every sold flat is red on the building`);
-  ok(reserved.every((id) => shown[id] === '#f7b500'), `${tag} overview: every reserved flat is yellow`);
-  ok(Object.entries(shown).filter(([id, c]) => c && !sold.includes(id) && !reserved.includes(id) && !statuses.find((s) => s.id === id && s.status === 'closed')).length === 0,
-    `${tag} overview: free flats are not coloured`);
+  ok(Object.values(await shown()).every((c) => !c), `${tag} overview: the building is not coloured at first`);
   if (!mobile) {
     const side = await page.innerText('#side');
     ok(/Продано\s+\d+/.test(side) && /Бронь\s+\d+/.test(side), 'overview panel: counts of free / reserved / sold');
     ok((await page.locator('#floors .dots i.s-sold').count()) === sold.length, 'floor list: a red dot per sold flat');
   }
   await page.screenshot({ path: `${OUT}/${tag}_overview.png` });
+
+  // the pointer on the top floor: its sold flats red, reserved yellow, free amber; no other floor lit
+  if (!mobile) {
+    const at = await page.evaluate(() => {
+      const app = window.__app;
+      const fl = app.apartments.find((a) => a.floor === 10);
+      const p = new app.THREE.Vector3(-8, fl.baseY + 1.5, 10.7).project(app.camera);
+      return [((p.x + 1) / 2) * innerWidth, ((1 - p.y) / 2) * innerHeight];
+    });
+    await page.mouse.move(at[0], at[1], { steps: 4 });
+    await page.waitForTimeout(700);
+    const lit = await shown();
+    const floorOf = (id) => +id.slice(1).split('-')[0];
+    const want = (id) => (sold.includes(id) || statuses.find((s) => s.id === id)?.status === 'closed' ? '#e5392f' : reserved.includes(id) ? '#f7b500' : '#ffa42b');
+    ok(Object.entries(lit).filter(([id]) => floorOf(id) === 10).every(([id, c]) => c === want(id)), 'floor 10 under the pointer: sold red, reserved yellow, free amber');
+    ok(Object.entries(lit).filter(([id]) => floorOf(id) !== 10).every(([, c]) => !c), 'floor 10 under the pointer: the other floors stay plain');
+    await page.screenshot({ path: `${OUT}/${tag}_hover.png` });
+    await page.mouse.move(5, 300);
+    await page.waitForTimeout(300);
+  }
 
   // a floor with a sale opened
   const soldApt = await page.evaluate((id) => {
@@ -120,11 +139,14 @@ for (const [tag, vp, mobile] of [['desk', { width: 1440, height: 900 }, false], 
     await crm.waitForSelector('.dialog', { state: 'detached' });
     await page.bringToFront();
     await page.waitForTimeout(1500);
+    ok((await page.locator('#floors .dots i.s-sold').count()) === sold.length + 1, `a flat sold in the CRM shows on the open 3D site (${freeId}: one more red dot)`);
+    await page.evaluate((id) => window.__app.selectFloor('A', +id.slice(1).split('-')[0]), freeId);
+    await page.waitForTimeout(2500);
     const c = await page.evaluate((id) => {
       const u = window.__app.building.units.get(id);
-      return u.overlay.visible && `#${u.overlay.material.color.getHexString()}`;
+      return u.tint.visible && `#${u.tint.material.color.getHexString()}`;
     }, freeId);
-    ok(c === '#e5392f', `a flat sold in the CRM turns red on the open 3D site (${freeId})`);
+    ok(c === '#e5392f', `… and red on its floor (${freeId})`);
     await page.screenshot({ path: `${OUT}/${tag}_after_sale.png` });
   }
   await page.close();
