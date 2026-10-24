@@ -7,7 +7,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
-import { MODEL_URL, toScene } from './config.js';
+import { MODEL_URL, SITE_URL, toScene } from './config.js';
 import { flagstone, materialFor, setupMaterial } from './materials.js';
 
 // The published artifact page can't serve .glb files, so it gets the same bytes base64-encoded
@@ -39,6 +39,39 @@ export const OUTLINE = {
   reservedLit: line(0xffb800, 4.5, 1, false),
 };
 
+// (the typical floors share one geometry: their twins share one too, so they are instanced with them)
+const twinGeometries = new Map();
+function splitTransparent(mesh) {
+  const mats = [mesh.material].flat();
+  const clear = (i) => !!mats[i]?.transparent;
+  if (!Array.isArray(mesh.material)) {
+    if (clear(0)) mesh.castShadow = false;
+    return;
+  }
+  const geo = mesh.geometry, groups = geo.groups;
+  if (!groups.some((g) => clear(g.materialIndex))) return;
+  if (groups.every((g) => clear(g.materialIndex))) {
+    mesh.castShadow = false;
+    return;
+  }
+  if (!twinGeometries.has(geo.uuid)) {
+    const g2 = new THREE.BufferGeometry();
+    for (const [name, attr] of Object.entries(geo.attributes)) g2.setAttribute(name, attr);
+    g2.setIndex(geo.index);
+    g2.boundingSphere = geo.boundingSphere;
+    g2.boundingBox = geo.boundingBox;
+    for (const g of groups) if (clear(g.materialIndex)) g2.addGroup(g.start, g.count, g.materialIndex);
+    geo.groups = groups.filter((g) => !clear(g.materialIndex));
+    twinGeometries.set(geo.uuid, g2);
+  }
+  const twin = new THREE.Mesh(twinGeometries.get(geo.uuid), mesh.material);
+  twin.name = `${mesh.name} glass`;
+  twin.castShadow = false;
+  twin.receiveShadow = mesh.receiveShadow;
+  twin.renderOrder = mesh.renderOrder;
+  mesh.add(twin);
+}
+
 export async function loadComplex(apartments, renderer, onProgress) {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const gltf = await loadModel(loader, MODEL_URL, onProgress);
@@ -52,30 +85,50 @@ export async function loadComplex(apartments, renderer, onProgress) {
   const tuned = new Set();
   const textures = []; // material texture loads (the model shows before they are all in)
 
+  // a mesh of the model: its materials configured (once each), shadows on; glass and water cast
+  // none (the depth pass would draw them solid), and a mesh of many materials keeps its shadows by
+  // moving its transparent groups to a twin mesh of its own (same buffers, same draw calls)
+  const prepare = (obj) => {
+    obj.castShadow = true;
+    obj.receiveShadow = true;
+    obj.material = Array.isArray(obj.material) ? obj.material.map(materialFor) : flagstone(obj, obj.material) ?? materialFor(obj.material);
+    for (const m of [obj.material].flat()) {
+      if (!tuned.has(m)) {
+        textures.push(setupMaterial(m, renderer));
+        tuned.add(m);
+      }
+    }
+    splitTransparent(obj);
+  };
   root.traverse((obj) => {
     const d = obj.userData;
     if (d.pick) {
       picks.push(obj);
       return;
     }
-    if (obj.isMesh) {
-      obj.castShadow = true;
-      obj.receiveShadow = true;
-      obj.material = Array.isArray(obj.material) ? obj.material.map(materialFor) : flagstone(obj, obj.material) ?? materialFor(obj.material);
-      for (const m of [obj.material].flat()) {
-        if (!tuned.has(m)) {
-          textures.push(setupMaterial(m, renderer));
-          tuned.add(m);
-        }
-        if (m.transparent) obj.castShadow = false;
-      }
-    }
+    if (obj.isMesh) prepare(obj);
     if (d.tower && d.part === 'roof') tower(d.tower).roof = obj;
     else if (d.tower && d.floor) {
       const f = (tower(d.tower).floors[d.floor] ??= {});
       f[d.part === 'walls' ? 'walls' : 'slab'] = obj;
     }
   });
+  // the grounds come in their own file after the house (tools/pack_model.mjs splits them off):
+  // the house is on screen while they download, they drop in round it when they arrive
+  const siteReady = loadModel(loader, SITE_URL)
+    .then((g) => {
+      const site = g.scene.children.find((c) => c.name === 'Site') ?? g.scene;
+      const list = [];
+      site.traverse((o) => o.isMesh && list.push(o));
+      for (const m of list) prepare(m);
+      root.add(site);
+      site.updateMatrixWorld(true);
+      return site;
+    })
+    .catch((e) => {
+      console.warn('the grounds did not load', e);
+      return null;
+    });
 
   // pick volumes -> highlight overlays
   const units = new Map();
@@ -178,7 +231,9 @@ export async function loadComplex(apartments, renderer, onProgress) {
   };
 
   return {
-    texturesReady: Promise.all(textures),
+    // (the grounds' textures are added to the list when they arrive)
+    texturesReady: siteReady.then(() => Promise.all(textures)),
+    siteReady,
     group: root,
     towers,
     units,

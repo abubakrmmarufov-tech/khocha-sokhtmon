@@ -11,6 +11,7 @@ import { CARS, PALMS, PEOPLE, TREES, toScene } from './config.js';
 import { addCars, addPalms, addPeople, addTrees } from './props.js';
 import { houseSet } from './houseTextures.js';
 import { Q } from './quality.js';
+import { sunPenumbraScale } from './shadows.js';
 import skyInfo from '../public/env/sky.json';
 
 const ENV = `${import.meta.env.BASE_URL}env/`;
@@ -130,6 +131,7 @@ function makeSky(sunDir, trees = false, light = { value: 1 }) {
       uCover: { value: +(LIGHT.get('clouds') ?? 0.68) },
       uTrees: { value: trees ? 1 : 0 },
       uLight: light,
+      uGlow: { value: +(LIGHT.get('glow') ?? 1) },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -145,6 +147,7 @@ function makeSky(sunDir, trees = false, light = { value: 1 }) {
       uniform float uCover;
       uniform float uTrees;
       uniform float uLight;
+      uniform float uGlow;
       varying vec3 vDir;
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p) {
@@ -178,6 +181,12 @@ function makeSky(sunDir, trees = false, light = { value: 1 }) {
         vec3 d = normalize(vDir);
         float e = degrees(asin(clamp(d.y, -1.0, 1.0)));
         vec3 col = gradient(e);
+        // the sun's glow: the haze scatters its light forward, so the sky brightens and warms
+        // towards the sun, most of all along the horizon on its side (uGlow 0 turns it off)
+        float toSun = max(dot(d, uSun), 0.0);
+        vec3 glow = vec3(1.0, 0.93, 0.82) * (0.05 * pow(toSun, 5.0) + 0.3 * pow(toSun, 60.0)) * uGlow;
+        glow += vec3(0.9, 0.86, 0.78) * 0.05 * pow(max(dot(normalize(vec3(d.x, 0.0, d.z) + 1e-5), normalize(vec3(uSun.x, 0.0, uSun.z) + 1e-5)), 0.0), 3.0) * exp(-max(d.y, 0.0) * 9.0) * uGlow;
+        col += glow * uGlow;
         if (d.y > 0.004) {
           // fair-weather cumulus: clusters from a low-frequency field, puffy cells from ridged noise,
           // the side towards the sun bright, the bottoms and the far side a soft blue-grey
@@ -185,12 +194,14 @@ function makeSky(sunDir, trees = false, light = { value: 1 }) {
           vec2 q = p * 1.05 + vec2(3.7, 1.9);
           float d0 = cumulus(q);
           float dens = smoothstep(uCover, uCover + 0.07, d0);
-          vec2 toSun = normalize(uSun.xz + 1e-4) * 0.09;
-          float dl = cumulus(q + toSun);
+          vec2 toSun2 = normalize(uSun.xz + 1e-4) * 0.09;
+          float dl = cumulus(q + toSun2);
           float lit = clamp(0.62 + (d0 - dl) * 5.0, 0.0, 1.0);
           float core = smoothstep(uCover + 0.04, uCover + 0.32, d0);
           vec3 cloud = mix(vec3(0.58, 0.64, 0.74), vec3(1.0, 1.0, 1.0), lit);
           cloud = mix(cloud, cloud * vec3(0.9, 0.92, 0.96), core * (1.0 - lit) * 0.6);
+          // a cloud in front of the sun is lit through (thin at its edge)
+          cloud += vec3(1.0, 0.95, 0.85) * pow(toSun, 20.0) * 0.25 * (1.0 - core) * uGlow;
           float fade = smoothstep(0.04, 0.2, d.y);
           col = mix(col, cloud, dens * fade);
         }
@@ -234,10 +245,33 @@ export function buildWorld(scene, renderer, after = Promise.resolve()) {
   // aerial perspective: the city a kilometre out a little hazy, the complex (100-400 m) clear
   scene.fog = new THREE.FogExp2(HAZE.getHex(), +(LIGHT.get('fog') ?? 0.0011));
   const skyLight = { value: 1 };
-  scene.add(makeSky(sunDir, false, skyLight));
+  const skyMesh = makeSky(sunDir, false, skyLight);
   scene.background = null;
   scene.backgroundIntensity = SKY_INTENSITY;
   scene.environmentIntensity = SKY_INTENSITY;
+  // The sky is drawn per pixel (its clouds stay crisp at any zoom). On phones that is a few dozen
+  // noise reads for every sky pixel of every frame: there it is drawn once into a cube map and the
+  // cube map is the background, redrawn only when the light changes (the hour, src/night.js).
+  let skyChanged = () => {};
+  if (Q.skyCube) {
+    const rt = new THREE.WebGLCubeRenderTarget(512, { type: THREE.HalfFloatType, generateMipmaps: false });
+    const cam = new THREE.CubeCamera(0.1, 2000, rt);
+    const skyScene = new THREE.Scene();
+    skyScene.add(skyMesh);
+    skyChanged = () => {
+      const tm = renderer.toneMapping;
+      renderer.toneMapping = THREE.NoToneMapping;
+      skyMesh.position.set(0, 0, 0);
+      cam.update(renderer, skyScene);
+      renderer.toneMapping = tm;
+    };
+    skyChanged();
+    scene.background = rt.texture;
+    scene.backgroundIntensity = 1; // (the drawn sky carries its own brightness)
+    scene.backgroundRotation.set(0, 0, 0);
+  } else {
+    scene.add(skyMesh);
+  }
 
   const sun = new THREE.DirectionalLight(new THREE.Color(SUN_COLOR), SUN_INTENSITY);
   sun.position.copy(sunDir).multiplyScalar(600);
@@ -253,6 +287,7 @@ export function buildWorld(scene, renderer, after = Promise.resolve()) {
   sc.far = 760;
   sun.shadow.bias = -0.00004;
   sun.shadow.normalBias = 0.015;
+  sun.shadow.radius = sunPenumbraScale(sun); // (src/shadows.js: the penumbra per depth, high level)
   scene.add(sun, sun.target);
 
   const fill = new THREE.HemisphereLight(0xd8e6f5, 0x8a8170, 1.2);
@@ -365,7 +400,7 @@ export function buildWorld(scene, renderer, after = Promise.resolve()) {
     scene.fog.color.setRGB(c[0] * k, c[1] * k, c[2] * k);
   };
   const ready = after
-    .then(() => sky('1k'))
+    .then(() => sky(Q.skyRes))
     .then((t) => {
       horizon(t);
       scene.fog.color.setRGB(...skyAt(1.0)).multiplyScalar(0.97);
@@ -425,5 +460,5 @@ export function buildWorld(scene, renderer, after = Promise.resolve()) {
     sun.updateMatrixWorld();
     scene.environmentRotation.set(0, -THREE.MathUtils.degToRad(az - HDRI_AZ), 0);
   };
-  return { sun, fill, cityMat, cityLights, aimSun, elevation: ELEV, skyLight, ready: Promise.all([ready, props]) };
+  return { sun, fill, cityMat, cityLights, aimSun, elevation: ELEV, skyLight, skyChanged, ready: Promise.all([ready, props]) };
 }

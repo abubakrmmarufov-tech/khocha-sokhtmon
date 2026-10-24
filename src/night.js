@@ -268,7 +268,11 @@ export function timeOfDay({ scene, renderer, world, lamps = [], toScene, cityLig
     const k = mix(0.05, 1, smooth(-10, 22, e));
     state.env = base.env * k;
     if (!indoors) scene.environmentIntensity = state.env;
-    world.skyLight.value = (1 - 0.85 * n) * (1 - 0.45 * g);
+    const skyLight = (1 - 0.85 * n) * (1 - 0.45 * g);
+    if (skyLight !== world.skyLight.value) {
+      world.skyLight.value = skyLight;
+      world.skyChanged(); // (the sky kept in a cube map on phones is redrawn)
+    }
     moonSky.intensity = dayFill * (1 - n) + 0.42 * n;
     for (const [m, v] of base.glass) m.envMapIntensity = v * (1 - 0.9 * n) * (1 - 0.3 * g);
     for (const [m, [day, night]] of base.glow) m.emissiveIntensity = mix(day, night, L);

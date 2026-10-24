@@ -5,6 +5,9 @@ import complex from './model/complex.json';
 import plans from './model/plans.json';
 
 export const MODEL_URL = `${import.meta.env.BASE_URL}models/house.glb`;
+// the grounds (lawns, roads, kerbs, benches...), a file of their own loaded after the house
+// (tools/pack_model.mjs): on a slow line the house shows first
+export const SITE_URL = MODEL_URL.replace(/house(\.[a-z]+)$/, 'site$1');
 export const PLANS = plans;
 
 // The sales CRM's database (crm/, Supabase: Project URL and the publishable / anon key from

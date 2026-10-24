@@ -28,8 +28,13 @@ export const Q = {
   pixelRatio: Math.min(devicePixelRatio || 1, high ? 2 : 1.5),
   shadowMap: high ? 4096 : 2048,
   ao: high,
-  skyRes: high ? '2k' : '1k',
+  // the sky HDRI only lights the scene (the visible sky is drawn): a small one does on phones
+  skyRes: high ? '1k' : '256',
   antialias: true,
+  // the sun's shadows soften with distance (src/shadows.js: 32 shadow-map reads a pixel)
+  softShadows: high,
+  // the drawn sky rendered once into a cube map instead of per pixel every frame (src/world.js)
+  skyCube: !high,
 };
 
 export function setQuality(level) {

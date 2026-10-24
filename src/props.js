@@ -24,6 +24,37 @@ function rng(seed) {
 // call per kind; size, turn and tint vary per tree.
 const TREE_URL = `${import.meta.env.BASE_URL}trees/`; // + a_ / b_ atlas prefix from trees.json
 const SIDES = 6;
+// A light breeze: the crowns sway a few centimetres (nothing on a still page stands quite still), the
+// top of a card most, its foot not at all; each tree in its own phase. main.js advances the time;
+// ?still freezes it for the screenshot tools. The sun's shadow map is not redrawn for it.
+export const WIND = { time: { value: 0 }, strength: { value: new URLSearchParams(location.search).has('still') ? 0 : 1 } };
+const SWAY = /* glsl */ `
+  #ifdef USE_INSTANCING
+    vec3 windAt = vec3( instanceMatrix[ 3 ] );
+  #else
+    vec3 windAt = vec3( 0.0 );
+  #endif
+  {
+    float ph = dot( windAt.xz, vec2( 0.37, 0.91 ) );
+    float k = clamp( position.y / 9.0, 0.0, 1.5 );
+    float sway = sin( uWindTime * 1.1 + ph ) * 0.6 + sin( uWindTime * 2.7 + ph * 1.7 ) * 0.4;
+    transformed.x += sway * uWind * 0.09 * k * k;
+    transformed.z += sin( uWindTime * 1.6 + ph * 0.6 ) * uWind * 0.05 * k * k;
+  }`;
+function windy(mat) {
+  const inner = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh) => {
+    inner?.(sh);
+    sh.uniforms.uWindTime = WIND.time;
+    sh.uniforms.uWind = WIND.strength;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uWindTime;\nuniform float uWind;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${SWAY}`);
+  };
+  const key = mat.customProgramCacheKey;
+  mat.customProgramCacheKey = () => `${key?.call(mat) ?? ''}wind`;
+  return mat;
+}
 
 function impostorGeometry(v) {
   const pos = [], nor = [], uv = [], idx = [];
@@ -115,7 +146,7 @@ function treeMaterial(atlas, size, bloom = '') {
       }`);
   };
   mat.customProgramCacheKey = () => `tree${px}${bloom}`;
-  return mat;
+  return windy(mat);
 }
 
 export function addTrees(scene, protos, list, placed, toScene, tag = '') {
@@ -248,8 +279,8 @@ export function addPalms(scene, list, toScene, houseSet) {
   const g = palmGeometry();
   const bark = houseSet('bark'), fr = houseSet('frond');
   const trunkMat = new THREE.MeshStandardMaterial({ map: bark.map, normalMap: bark.normal, color: 0xd6c8b6, roughness: 0.95 });
-  const leafMat = new THREE.MeshStandardMaterial({ map: fr.map, alphaMap: fr.alpha, alphaTest: 0.45, alphaToCoverage: true, side: THREE.DoubleSide, color: 0xa9c08e, roughness: 0.75, envMapIntensity: 0.6 });
-  const dryMat = new THREE.MeshStandardMaterial({ map: fr.map, alphaMap: fr.alpha, alphaTest: 0.45, side: THREE.DoubleSide, color: 0xb8925a, roughness: 0.9 });
+  const leafMat = windy(new THREE.MeshStandardMaterial({ map: fr.map, alphaMap: fr.alpha, alphaTest: 0.45, alphaToCoverage: true, side: THREE.DoubleSide, color: 0xa9c08e, roughness: 0.75, envMapIntensity: 0.6 }));
+  const dryMat = windy(new THREE.MeshStandardMaterial({ map: fr.map, alphaMap: fr.alpha, alphaTest: 0.45, side: THREE.DoubleSide, color: 0xb8925a, roughness: 0.9 }));
   const meshes = [[g.trunk, trunkMat], [g.crown, leafMat], [g.dry, dryMat]].map(([geo, mat]) => {
     const m = new THREE.InstancedMesh(geo, mat, list.length);
     m.castShadow = true;

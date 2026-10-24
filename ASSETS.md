@@ -11,7 +11,7 @@ neutral grey, sun disc removed from the sky). Licence: https://polyhaven.com/lic
 
 | Asset | Author (Poly Haven page) | Used for | Shipped as |
 |---|---|---|---|
-| [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | Greg Zaal, Jarod Guest | sky: background, ambient light, reflections; sun direction | `public/env/sky_{1k,2k}.hdr`, `sky.json` |
+| [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | Greg Zaal, Jarod Guest | sky: ambient light, reflections; sun direction (the 256 px copy, `tools/hdr_small.py`, lights the phone level) | `public/env/sky_{256,1k,2k}.hdr`, `sky.json` |
 | [Painted Plaster Wall](https://polyhaven.com/a/painted_plaster_wall) | Amal Kumar | facade render, slab edges, plant rooms | `public/textures/plaster/` |
 | [Concrete Wall 008](https://polyhaven.com/a/concrete_wall_008) | Dario Barresi, Charlotte Baglioni | kerbs, bridge, embankment, planters, roofs, context blocks | `public/textures/concrete/` |
 | [Aerial Asphalt 01](https://polyhaven.com/a/aerial_asphalt_01) | Rob Tuytel | roads (one tile = 30 m) | `public/textures/asphalt/` |

@@ -5,8 +5,12 @@
 // Exposure and tone mapping are the same in both, so the two levels differ in detail, not in look.
 import * as THREE from 'three';
 import { Q } from './quality.js';
+import { installSoftShadows } from './shadows.js';
 
 const params = new URLSearchParams(location.search);
+// the sun's shadows soften with distance from what casts them (src/shadows.js); ?shadows=pcf keeps
+// three.js's own filter to compare
+if (Q.softShadows && params.get('shadows') !== 'pcf') installSoftShadows();
 export const EXPOSURE = +(params.get('exposure') ?? 1.0);
 // tone mapping: Khronos PBR Neutral keeps the colours of the materials as they are (no extra
 // saturation or contrast) and rolls off only the highlights; ?tonemap=agx|aces to compare

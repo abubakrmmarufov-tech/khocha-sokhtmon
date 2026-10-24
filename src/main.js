@@ -13,8 +13,9 @@ import { WalkControls } from './walk.js';
 import { drawPlan, planTransform } from './plan.js';
 import { Q, setQuality } from './quality.js';
 import { createRenderer, createPipeline } from './render.js';
+import { sunPenumbraScale } from './shadows.js';
 import { setupMaterial, water } from './materials.js';
-import { updateCars } from './props.js';
+import { WIND, updateCars } from './props.js';
 import { BRAND, L, getLang, num, setLang } from './i18n.js';
 import { DAY, FIRST, LAST, clock as hhmm, timeOfDay } from './night.js';
 import { ROOM_LIGHT } from './interior/materials.js';
@@ -125,6 +126,7 @@ modelLoad
     scene.add(b.group);
     setupMaterial(world.cityMat, renderer);
     shadowsDirty();
+    b.siteReady.then(shadowsDirty); // (the grounds arrive after the house)
     loadingEl.hidden = true;
     refresh();
   })
@@ -722,6 +724,7 @@ function lightInterior(interior) {
   lightIndoors();
   sun.target.updateMatrixWorld();
   sc.updateProjectionMatrix();
+  sun.shadow.radius = sunPenumbraScale(sun); // (the shadow camera changed: src/shadows.js)
   shadowsDirty();
 }
 
@@ -1027,6 +1030,7 @@ renderer.setAnimationLoop(() => {
     if (building) updateLabels();
   }
   for (const n of water) n.offset.x += dt * 0.006, n.offset.y += dt * 0.004;
+  WIND.time.value += dt;
   // the rooms' own light at night: an open floor seen from outside, or the flat walked through
   ROOM_LIGHT.value = !daytime ? 0 : daytime.state.lights * (state.mode === 'walk' ? 0.38 : 0.55);
   if (state.mode !== 'walk') followSun(dt);
@@ -1039,13 +1043,14 @@ renderer.setAnimationLoop(() => {
   watchFrames();
 });
 
-// High graphics on a slower computer (a Retina laptop renders four times the pixels at twice the
-// pixel ratio, 4x multisampled, with ambient occlusion): once the model is in and the shaders are
-// compiled, the frame times are watched over 3-second stretches of a visible page; while they are
-// slow (under ~28 fps) the pixel ratio steps down to 1. Still slow at 1: the light level is offered.
+// A slower device (a Retina laptop renders four times the pixels at twice the pixel ratio, 4x
+// multisampled, with ambient occlusion; an older phone fewer pixels, but a weak GPU): once the model
+// is in and the shaders are compiled, the frame times are watched over 3-second stretches of a
+// visible page; while they are slow (under ~28 fps) the pixel ratio steps down to 1. Still slow at
+// 1: on the high level the light level is offered; on the light level the sun's shadow map is halved.
 let watch = null;
 function watchFrames() {
-  if (Q.level !== 'high' || !building || document.hidden) {
+  if (!building || document.hidden) {
     watch = null;
     return;
   }
@@ -1063,12 +1068,21 @@ function watchFrames() {
   if (fps >= 28) return;
   const pr = renderer.getPixelRatio();
   if (pr > 1.01) {
-    renderer.setPixelRatio(Math.max(1, pr - 0.5));
+    renderer.setPixelRatio(Math.max(1, pr - (Q.level === 'high' ? 0.5 : 0.25)));
     pipeline.setSize(innerWidth, innerHeight);
     shadowsDirty();
-  } else if (!watch.offered) {
-    watch.offered = true;
-    toast(L().slowHint, 7000);
+  } else if (Q.level === 'high') {
+    if (!watch.offered) {
+      watch.offered = true;
+      toast(L().slowHint, 7000);
+    }
+  } else if (world.sun.shadow.mapSize.x > 1024) {
+    const s = world.sun.shadow;
+    s.mapSize.set(1024, 1024);
+    s.map?.dispose();
+    s.map = null;
+    s.radius = sunPenumbraScale(world.sun);
+    shadowsDirty();
   }
 }
 

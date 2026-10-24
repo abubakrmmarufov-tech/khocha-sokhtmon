@@ -268,8 +268,9 @@ const LIB = {
   // ---- the house (renders 1-8) ----
   // white render and stone: the plaster set's relief and roughness, no colour map (the renders' white
   // is white); the rusticated piers a touch rougher
-  'Facade white': { set: 'plaster', mapless: true, tile: 2.2, color: '#fbfbf9', roughness: 0.78, normal: 0.14, vary: 0.008, env: 1.0 },
-  'Rustic white': { set: 'plaster', mapless: true, tile: 2.2, color: '#f8f8f6', roughness: 0.78, normal: 0.22, vary: 0.008, env: 1.0 },
+  // (vary: a faint mottle over the metres, as rendered walls have; the white stays white)
+  'Facade white': { set: 'plaster', mapless: true, tile: 2.2, color: '#fbfbf9', roughness: 0.78, normal: 0.14, vary: 0.02, env: 1.0 },
+  'Rustic white': { set: 'plaster', mapless: true, tile: 2.2, color: '#f8f8f6', roughness: 0.78, normal: 0.22, vary: 0.02, env: 1.0 },
   'Panel white': { set: 'plaster', mapless: true, tile: 2.2, color: '#f4f2ed', roughness: 0.7, normal: 0.2, env: 0.85 },
   // the stair windows' column in the back's recess: light grey panels between the windows (renders 3, 7)
   'Panel grey': { set: 'plaster', mapless: true, tile: 2.2, color: '#c6cacd', roughness: 0.65, normal: 0.12, env: 0.9 },
