@@ -265,12 +265,12 @@ function updateOverlays() {
     } else if (state.mode === 'floor') {
       if (isOpen(a)) {
         // the flats of the open floor: a light outline each; the one under the pointer (or chosen)
-        // lit up in amber with a thick outline drawn over the walls and furniture; a sold one red,
-        // a reserved one yellow (drawn on its floor: a tint and its outline, not the storey-high
-        // pick volume)
+        // lit up in amber with a thick outline drawn over the walls and furniture; a sold one red and
+        // a reserved one yellow, under the pointer too (drawn on its floor: a tint and its outline,
+        // not the storey-high pick volume)
         const lit = a === state.apt || a === state.hoverApt;
         show = true; onFloor = true; color = taken ?? (lit ? 0xffa42b : ACCENT);
-        edges = a === state.apt ? OUTLINE.chosen : a === state.hoverApt ? OUTLINE.hover : taken ? OUTLINE[statusOf(a)] : OUTLINE.open;
+        edges = taken ? OUTLINE[lit ? `${statusOf(a)}Lit` : statusOf(a)] : a === state.apt ? OUTLINE.chosen : a === state.hoverApt ? OUTLINE.hover : OUTLINE.open;
         op = taken ? (lit ? 0.62 : 0.5) : a === state.apt ? 0.42 : a === state.hoverApt ? 0.36 : 0.06;
         if (filterActive() && !matches(a)) [op, edges] = [0.0, null];
       } else if (hoverFloor && a.floor < state.floor) {
@@ -289,7 +289,7 @@ function updateOverlays() {
     (line === u.ring ? u.edges : u.ring).visible = false;
     line.visible = show && !!edges;
     if (edges) line.material = edges;
-    line.renderOrder = edges === OUTLINE.hover || edges === OUTLINE.chosen ? 12 : 11;
+    line.renderOrder = onFloor && (a === state.apt || a === state.hoverApt) ? 12 : 11;
   }
 }
 

@@ -33,6 +33,10 @@ export const OUTLINE = {
   sold: line(0xe5392f, 3.4, 1, false),
   closed: line(0xe5392f, 3.4, 1, false),
   reserved: line(0xf2b100, 3.4, 1, false),
+  // ... and under the pointer or chosen: as thick as the amber line of a free flat, in its own colour
+  soldLit: line(0xff2a1f, 4.5, 1, false),
+  closedLit: line(0xff2a1f, 4.5, 1, false),
+  reservedLit: line(0xffb800, 4.5, 1, false),
 };
 
 export async function loadComplex(apartments, renderer, onProgress) {

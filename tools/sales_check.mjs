@@ -112,6 +112,24 @@ for (const [tag, vp, mobile] of [['desk', { width: 1440, height: 900 }, false], 
   }, sold.at(-1));
   ok(tint === '#e5392f', `${tag} floor ${soldApt.floor}: the sold flat is tinted red on its floor`);
   await page.screenshot({ path: `${OUT}/${tag}_floor.png` });
+  if (!mobile) {
+    // the pointer on a sold flat lights it red (outline, tag); on a free one amber, as before
+    const pointed = (sel) => page.evaluate((s) => {
+      const a = window.__app, id = a.state.hoverApt?.id, r = id && a.building.units.get(id).ring;
+      const t = document.querySelector(s);
+      return id && { id, line: `#${r.material.color.getHexString()}`, width: r.material.linewidth, tag: t && getComputedStyle(t).backgroundColor };
+    }, sel);
+    await page.locator('.tag.s-sold').first().hover();
+    await page.waitForTimeout(400);
+    const s = await pointed('.tag.s-sold.hover');
+    ok(s && s.line === '#ff2a1f' && s.width === 4.5 && s.tag === 'rgb(229, 57, 47)', `pointing at sold ${s?.id}: red outline and red tag (${JSON.stringify(s)})`);
+    await page.screenshot({ path: `${OUT}/${tag}_point_sold.png` });
+    await page.locator('.tag.s-free').first().hover();
+    await page.waitForTimeout(400);
+    const f = await pointed('.tag.s-free.hover');
+    ok(f && f.line === '#ffa42b' && f.tag === 'rgb(255, 164, 43)', `pointing at free ${f?.id}: amber as before`);
+    await page.mouse.move(5, 300);
+  }
   await page.evaluate((id) => window.__app.selectApt(window.__app.apartments.find((a) => a.id === id)), sold.at(-1));
   await page.waitForTimeout(3000);
   ok((await page.innerText('#side')).includes('Продана'), `${tag} card of № ${soldApt.number}: «Продана»`);
