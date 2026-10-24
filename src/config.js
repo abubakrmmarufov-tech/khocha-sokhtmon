@@ -7,6 +7,16 @@ import plans from './model/plans.json';
 export const MODEL_URL = `${import.meta.env.BASE_URL}models/house.glb`;
 export const PLANS = plans;
 
+// The sales CRM's database (crm/, Supabase: Project URL and the publishable / anon key from
+// Project Settings -> API), written here or given to the build as VITE_SALES_URL / VITE_SALES_KEY.
+// The key is public by design: what it may read is set by the database's rules
+// (crm/supabase/schema.sql), the 3D site only the list of sold and reserved flats. Left empty, the
+// CRM runs as a demo kept in the browser, and this site shows the demo's statuses in that browser only.
+export const SALES = {
+  url: import.meta.env.VITE_SALES_URL ?? '',
+  key: import.meta.env.VITE_SALES_KEY ?? '',
+};
+
 // Site plan coordinates (metres, x east, y north) -> scene (x, z) with the site centre at the origin.
 const [CX, CY] = complex.site_centre;
 export const toScene = (x, y) => ({ x: x - CX, z: -(y - CY) });

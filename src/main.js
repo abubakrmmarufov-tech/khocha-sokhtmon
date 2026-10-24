@@ -18,9 +18,12 @@ import { updateCars } from './props.js';
 import { BRAND, L, getLang, num, setLang } from './i18n.js';
 import { DAY, FIRST, LAST, clock as hhmm, timeOfDay } from './night.js';
 import { ROOM_LIGHT } from './interior/materials.js';
+import { hasStatuses, isFree, statusOf, watchSales } from './sales.js';
 
 const $ = (s) => document.querySelector(s);
 const ACCENT = 0xc8955a;
+// sold (or taken off sale) and reserved flats, from the sales CRM (src/sales.js)
+const TAKEN = { sold: 0xe5392f, closed: 0xe5392f, reserved: 0xf7b500 };
 
 // ---------- static wording ----------
 function applyStatic() {
@@ -179,15 +182,15 @@ const state = {
   apt: null,
   hoverApt: null,
   hoverFloor: null, // { tower, floor }
-  filter: { rooms: 0 },
+  filter: { rooms: 0, free: false },
 };
 let dollhouse = [];
 let walkInterior = null;
 let lastInteraction = performance.now();
 
 const isOpen = (a) => a.tower === state.tower && a.floor === state.floor;
-const filterActive = () => state.filter.rooms > 0;
-const matches = (a) => !state.filter.rooms || a.rooms === state.filter.rooms || (state.filter.rooms === 4 && a.rooms >= 4);
+const filterActive = () => state.filter.rooms > 0 || state.filter.free;
+const matches = (a) => (!state.filter.rooms || a.rooms === state.filter.rooms || (state.filter.rooms === 4 && a.rooms >= 4)) && (!state.filter.free || isFree(a));
 const sameFloor = (a, b) => !!a && !!b && a.tower === b.tower && a.floor === b.floor;
 
 // ---------- camera flights ----------
@@ -248,26 +251,31 @@ function updateOverlays() {
     if (!u) continue;
     let show = false, color = 0xffffff, op = 0, edges = null, onFloor = false;
     const hoverFloor = sameFloor(state.hoverFloor, a);
+    // a flat that is sold or reserved stays red (yellow) on the building, whatever else is lit
+    const taken = TAKEN[statusOf(a)];
     if (state.mode === 'overview') {
       if (hoverFloor) {
         // the floor under the pointer: amber on the white stone, with a white outline round every flat
-        show = true; op = 0.62; edges = OUTLINE.floor; color = 0xffa42b;
+        show = true; op = taken ? 0.72 : 0.62; edges = OUTLINE.floor; color = taken ?? 0xffa42b;
+      } else if (taken) {
+        show = true; color = taken; op = 0.55;
       } else if (filterActive() && matches(a)) {
         show = true; color = ACCENT; op = 0.55;
       }
     } else if (state.mode === 'floor') {
       if (isOpen(a)) {
         // the flats of the open floor: a light outline each; the one under the pointer (or chosen)
-        // lit up in amber with a thick outline drawn over the walls and furniture
-        // (drawn on its floor: a tint and its outline, not the storey-high pick volume)
+        // lit up in amber with a thick outline drawn over the walls and furniture; a sold one red,
+        // a reserved one yellow (drawn on its floor: a tint and its outline, not the storey-high
+        // pick volume)
         const lit = a === state.apt || a === state.hoverApt;
-        show = true; onFloor = true; color = lit ? 0xffa42b : ACCENT;
-        edges = a === state.apt ? OUTLINE.chosen : a === state.hoverApt ? OUTLINE.hover : OUTLINE.open;
-        op = a === state.apt ? 0.42 : a === state.hoverApt ? 0.36 : 0.06;
+        show = true; onFloor = true; color = taken ?? (lit ? 0xffa42b : ACCENT);
+        edges = a === state.apt ? OUTLINE.chosen : a === state.hoverApt ? OUTLINE.hover : taken ? OUTLINE[statusOf(a)] : OUTLINE.open;
+        op = a === state.apt ? 0.42 : a === state.hoverApt ? 0.36 : taken ? 0.3 : 0.06;
         if (filterActive() && !matches(a)) [op, edges] = [0.0, null];
       } else if (hoverFloor && a.floor < state.floor) {
         // (a floor above the open one is cut away: nothing to light)
-        show = true; op = 0.35;
+        show = true; op = 0.35; color = taken ?? color;
       }
     }
     const fill = onFloor ? u.tint : u.overlay;
@@ -322,8 +330,9 @@ function buildLabels() {
     liftLabels.push({ ...tag, pos: new THREE.Vector3(t.x, t.y, t.z) });
   }
   for (const a of aptsOnFloor(state.tower, state.floor)) {
-    const tag = add('tag', `<b>№ ${a.number}</b><span>${num(a.area)} ${L().m2}</span>`);
-    tag.el.title = `№ ${a.number} · ${L().roomsShort(a.rooms)} · ${num(a.area)} ${L().m2}`;
+    const s = statusOf(a);
+    const tag = add(`tag s-${s}`, `<b>№ ${a.number}</b><span>${s === 'free' ? `${num(a.area)} ${L().m2}` : L().status[s]}</span>`);
+    tag.el.title = `№ ${a.number} · ${L().roomsShort(a.rooms)} · ${num(a.area)} ${L().m2}${s === 'free' ? '' : ` · ${L().status[s]}`}`;
     tag.el.onclick = () => selectApt(a);
     tag.el.onpointerenter = () => setHover(a);
     tag.el.onpointerleave = () => setHover(null);
@@ -380,8 +389,9 @@ function renderFloors() {
     const n = list.filter(matches).length;
     const active = state.mode === 'floor' && state.floor === f;
     const hover = state.hoverFloor && state.hoverFloor.floor === f;
+    const dots = hasStatuses() ? `<span class="dots">${[...list].sort((a, b) => a.number - b.number).map((a) => `<i class="s-${statusOf(a)}"></i>`).join('')}</span>` : '';
     html += `<button class="floor-btn ${active ? 'active' : ''} ${hover ? 'hover' : ''} ${filterActive() && !n ? 'dim' : ''}" data-floor="${f}">
-      <span class="num">${f}</span><span class="meta">${filterActive() ? `${n} / ` : ''}${list.length ? T.flats(list.length) : '—'}</span></button>`;
+      <span class="num">${f}</span><span class="meta">${filterActive() ? `${n} / ` : ''}${list.length ? T.flats(list.length) : '—'}${dots}</span></button>`;
   }
   html += `<button class="floor-btn lobby" disabled><span class="num">1–2</span><span class="meta">${T.shops}</span></button>`;
   $('#floors').innerHTML = html;
@@ -410,7 +420,15 @@ function roomFilter(list) {
   const rooms = [...new Set(list.map((a) => Math.min(a.rooms, 4)))].sort();
   return `<div class="label">${T.rooms}</div><div class="seg" data-filter="rooms">
     ${[0, ...rooms].map((r) => `<button data-v="${r}" class="${state.filter.rooms === r ? 'on' : ''}">${r ? T.roomsShort(r) : T.all}</button>`).join('')}
-  </div>`;
+  </div>${hasStatuses() ? `<label class="toggle"><input type="checkbox" data-act="free" ${state.filter.free ? 'checked' : ''}> ${T.onlyFree}</label>` : ''}`;
+}
+
+// free / reserved / sold, with how many of each (flats taken off sale count as sold here)
+function salesLegend(list) {
+  if (!hasStatuses()) return '';
+  const T = L();
+  const n = (k) => list.filter((a) => (k === 'sold' ? ['sold', 'closed'].includes(statusOf(a)) : statusOf(a) === k)).length;
+  return `<div class="sales-legend">${['free', 'reserved', 'sold'].map((k) => `<span class="s-${k}"><i></i>${T.statusMany[k]} <b>${n(k)}</b></span>`).join('')}</div>`;
 }
 
 function renderSide() {
@@ -432,6 +450,7 @@ function renderSide() {
         <div class="stat"><b>${apartments.length ? `${num(Math.round(a0))}–${num(Math.round(a1))}` : '—'}</b><span>${T.stat2}</span></div>
         <div class="stat"><b>${t.levels}</b><span>${T.stat3}</span></div>
       </div>
+      ${salesLegend(apartments)}
       ${apartments.length ? roomFilter(apartments) : ''}
       <div class="note">${apartments.length ? T.chooseNote : T.noPlans}</div>`;
   } else if (state.mode === 'floor' && !state.apt) {
@@ -443,11 +462,12 @@ function renderSide() {
       ${list.length ? roomFilter(list) : ''}
       <div class="apt-list">
         ${[...list].sort((a, b) => a.number - b.number).map((a) => `
-          <button class="apt-row ${filterActive() && !matches(a) ? 'muted' : ''}" data-apt="${a.id}">
+          <button class="apt-row s-${statusOf(a)} ${filterActive() && !matches(a) ? 'muted' : ''}" data-apt="${a.id}">
             <span class="t">№ ${a.number}</span><span class="p">${num(a.area)} ${T.m2}</span>
-            <span class="d">${T.roomsN(a.rooms)} · ${sidesText(a)}</span>
+            <span class="d">${T.roomsN(a.rooms)} · ${sidesText(a)}</span>${isFree(a) ? '' : `<span class="st">${T.status[statusOf(a)]}</span>`}
           </button>`).join('')}
       </div>
+      ${salesLegend(list)}
       ${list.length ? `<div class="note">${T.floorNote}</div>` : ''}`;
   } else if (state.mode === 'floor' && state.apt) {
     const a = state.apt;
@@ -455,6 +475,7 @@ function renderSide() {
       <button class="back" data-act="floor">${T.backTo(T.floorN(a.floor))}</button>
       <h2>${T.flat(a.number)}</h2>
       <div class="sub">${T.roomsN(a.rooms)} · ${T.floorN(a.floor)}</div>
+      ${isFree(a) ? '' : `<div class="sale-badge s-${statusOf(a)}">${T.status[statusOf(a)]}</div>`}
       <div class="plan-wrap"><canvas class="plan" title="${T.planZoom}"></canvas><button class="plan-zoom" data-act="zoom" title="${T.planZoom}" aria-label="${T.planZoom}">⤢</button></div>
       <div class="area-big">${num(a.area)} <small>${T.m2}</small></div>
       <div class="specs">
@@ -518,6 +539,11 @@ $('#side').addEventListener('click', (e) => {
     state.filter.rooms = +b.dataset.v;
     refresh();
   }
+});
+$('#side').addEventListener('change', (e) => {
+  if (e.target.dataset.act !== 'free') return;
+  state.filter.free = e.target.checked;
+  refresh();
 });
 $('#side').addEventListener('pointerover', (e) => {
   const row = e.target.closest('[data-apt]');
@@ -876,7 +902,8 @@ canvas.addEventListener('pointermove', (e) => {
   if (hit?.floor) {
     const list = aptsOnFloor(HOUSE.key, hit.floor);
     const n = filterActive() ? list.filter(matches).length : list.length;
-    tooltip.innerHTML = T.tipFloor(hit.floor, list.length ? T.flats(n) : T.noPlans);
+    const free = hasStatuses() && list.length ? ` · ${T.freeN(list.filter(isFree).length)}` : '';
+    tooltip.innerHTML = T.tipFloor(hit.floor, list.length ? `${T.flats(n)}${free}` : T.noPlans);
     tooltip.style.left = `${e.clientX + 16}px`;
     tooltip.style.top = `${e.clientY + 12}px`;
     tooltip.style.opacity = 1;
@@ -1048,6 +1075,10 @@ function watchFrames() {
 refresh();
 frameCentre();
 camera.updateProjectionMatrix();
+watchSales(() => {
+  buildLabels();
+  refresh();
+});
 const STILL = new URLSearchParams(location.search).has('still');
 lastInteraction = STILL ? Infinity : performance.now();
 

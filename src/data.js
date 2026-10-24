@@ -1,5 +1,5 @@
 // Apartments of blocks А, Б and Г, as drawn on the floor plans (model/plans.json). Areas and the
-// number of rooms are the ones written on the sheets; no prices or sales statuses (on purpose).
+// number of rooms are the ones written on the sheets. Whether a flat is sold: sales.js (from the CRM).
 import { PLANS, RESIDENTIAL, planFrame, LETTER } from './config.js';
 import { centroid, polygonArea } from './geometry.js';
 import { L, plural } from './i18n.js';

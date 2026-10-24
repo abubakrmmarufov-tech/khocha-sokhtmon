@@ -70,6 +70,10 @@ const RU = {
   slowHint: 'Если 3D работает медленно, переключите графику на лёгкую (кнопка в правом нижнем углу).',
   showUi: 'Показать панели',
   dayTime: 'Время суток',
+  status: { free: 'Свободна', reserved: 'Забронирована', sold: 'Продана', closed: 'Нет в продаже' },
+  statusMany: { free: 'Свободно', reserved: 'Бронь', sold: 'Продано' },
+  onlyFree: 'Только свободные',
+  freeN: (n) => `свободно ${n}`,
   room: { 'Living room': 'Гостиная', Kitchen: 'Кухня', Bedroom: 'Спальня', Bathroom: 'Ванная', WC: 'Санузел', Hall: 'Прихожая', Wardrobe: 'Гардероб', Loggia: 'Лоджия', Terrace: 'Терраса', Balcony: 'Балкон', 'Guest room': 'Гостевая', 'Common room': 'Общая комната', 'AC niche': 'Кондиционер' },
   lang: 'RU',
 };
@@ -135,6 +139,10 @@ const TJ = {
   slowHint: 'Агар 3D суст кор кунад, графикаро ба сабук гузаронед (тугма дар кунҷи рости поён).',
   showUi: 'Нишон додани панелҳо',
   dayTime: 'Вақти шабонарӯз',
+  status: { free: 'Озод', reserved: 'Банд шудааст', sold: 'Фурӯхта шуд', closed: 'Барои фурӯш нест' },
+  statusMany: { free: 'Озод', reserved: 'Банд', sold: 'Фурӯхта шуд' },
+  onlyFree: 'Танҳо озодҳо',
+  freeN: (n) => `озод ${n}`,
   room: { 'Living room': 'Меҳмонхона', Kitchen: 'Ошхона', Bedroom: 'Хонаи хоб', Bathroom: 'Ҳаммом', WC: 'Ҳоҷатхона', Hall: 'Даҳлез', Wardrobe: 'Либосхона', Loggia: 'Айвон', Terrace: 'Терраса', Balcony: 'Балкон', 'Guest room': 'Меҳмонхона', 'Common room': 'Ҳуҷраи умумӣ', 'AC niche': 'Кондитсионер' },
   lang: 'TJ',
 };

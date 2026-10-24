@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "dev:crm": "vite --config crm/vite.config.js",
+    "build": "vite build && vite build --config crm/vite.config.js",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "n8ao": "^1.10.3",
     "postprocessing": "^6.39.5",
     "three": "^0.170.0"

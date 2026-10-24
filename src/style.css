@@ -106,6 +106,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .apt-row .d { font-size: 12px; color: var(--muted); }
 .apt-row .p { font-weight: 700; text-align: right; }
 
+.apt-row .st { font-size: 11px; font-weight: 700; text-align: right; align-self: center; }
+.apt-row.s-sold, .apt-row.s-closed { background: #fdf0ef; }
+.apt-row.s-sold .st, .apt-row.s-closed .st, .apt-row.s-sold .t, .apt-row.s-closed .t { color: #c62f26; }
+.apt-row.s-reserved { background: #fff8e3; }
+.apt-row.s-reserved .st { color: #9a6c00; }
+/* sold / reserved: the legend, the flat card's badge, the tags of the open floor, the floor list's dots */
+.sales-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0 2px; font-size: 12.5px; color: var(--muted); }
+.sales-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sales-legend b { color: var(--ink); }
+.sales-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; background: #3aa757; }
+.sales-legend .s-reserved i { background: #f7b500; }
+.sales-legend .s-sold i { background: #e5392f; }
+.sale-badge { display: inline-block; margin: 2px 0 6px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: #fff; background: #e5392f; }
+.sale-badge.s-reserved { background: #f7b500; color: #3b2a00; }
+.tag.s-sold, .tag.s-closed { border-bottom-color: #e5392f; }
+.tag.s-sold span, .tag.s-closed span { color: #c62f26; font-weight: 700; }
+.tag.s-reserved { border-bottom-color: #f7b500; }
+.tag.s-reserved span { color: #8a6100; font-weight: 700; }
+.floor-btn .dots i { background: #3aa757; }
+.floor-btn .dots i.s-sold, .floor-btn .dots i.s-closed { background: #e5392f; }
+.floor-btn .dots i.s-reserved { background: #f7b500; }
+.floor-btn.active .dots i { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55); }
 .status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; }
 .status i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
