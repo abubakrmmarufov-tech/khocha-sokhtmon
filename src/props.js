@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { Q } from './quality.js';
+import { cheapShadow } from './shadows.js';
 import TREES_INFO from '../public/trees/trees.json';
 
 // deterministic noise so every visit looks the same
@@ -146,7 +147,7 @@ function treeMaterial(atlas, size, bloom = '') {
       }`);
   };
   mat.customProgramCacheKey = () => `tree${px}${bloom}`;
-  return windy(mat);
+  return cheapShadow(windy(mat));
 }
 
 export function addTrees(scene, protos, list, placed, toScene, tag = '') {
@@ -278,9 +279,9 @@ export function addPalms(scene, list, toScene, houseSet) {
   if (!list.length) return;
   const g = palmGeometry();
   const bark = houseSet('bark'), fr = houseSet('frond');
-  const trunkMat = new THREE.MeshStandardMaterial({ map: bark.map, normalMap: bark.normal, color: 0xd6c8b6, roughness: 0.95 });
-  const leafMat = windy(new THREE.MeshStandardMaterial({ map: fr.map, alphaMap: fr.alpha, alphaTest: 0.45, alphaToCoverage: true, side: THREE.DoubleSide, color: 0xa9c08e, roughness: 0.75, envMapIntensity: 0.6 }));
-  const dryMat = windy(new THREE.MeshStandardMaterial({ map: fr.map, alphaMap: fr.alpha, alphaTest: 0.45, side: THREE.DoubleSide, color: 0xb8925a, roughness: 0.9 }));
+  const trunkMat = cheapShadow(new THREE.MeshStandardMaterial({ map: bark.map, normalMap: bark.normal, color: 0xd6c8b6, roughness: 0.95 }));
+  const leafMat = cheapShadow(windy(new THREE.MeshStandardMaterial({ map: fr.map, alphaMap: fr.alpha, alphaTest: 0.45, alphaToCoverage: true, side: THREE.DoubleSide, color: 0xa9c08e, roughness: 0.75, envMapIntensity: 0.6 })));
+  const dryMat = cheapShadow(windy(new THREE.MeshStandardMaterial({ map: fr.map, alphaMap: fr.alpha, alphaTest: 0.45, side: THREE.DoubleSide, color: 0xb8925a, roughness: 0.9 })));
   const meshes = [[g.trunk, trunkMat], [g.crown, leafMat], [g.dry, dryMat]].map(([geo, mat]) => {
     const m = new THREE.InstancedMesh(geo, mat, list.length);
     m.castShadow = true;
@@ -477,7 +478,7 @@ export function addPeople(scene, list, toScene) {
   const n = list.length;
   // [standing, walking] x [trousers, skirt]
   const kinds = [[0.02, false], [0.3, false], [0.02, true], [0.24, true]];
-  const mk = (geo, rough, side = THREE.FrontSide) => new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: rough, side }), n);
+  const mk = (geo, rough, side = THREE.FrontSide) => new THREE.InstancedMesh(geo, cheapShadow(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: rough, side })), n);
   const sets = kinds.map(([stride, skirt]) => {
     const p = personParts(stride, skirt);
     return { legs: mk(p.legs, 0.9, THREE.DoubleSide), shoes: mk(p.shoes, 0.55), body: mk(p.body, 0.85), head: mk(p.head, 0.6), hair: mk(p.hair, 0.75, THREE.DoubleSide) };

@@ -42,9 +42,10 @@ const PCSS = /* glsl */ `
   vec2 disc[ 16 ];
   ${POISSON.map(([x, y], i) => `disc[ ${i} ] = rot * vec2( ${x.toFixed(8)}, ${y.toFixed(8)} );`).join('\n  ')}
   // 1. blockers: the average depth of what lies in front of the receiver within the widest penumbra
+  //    (12 taps: most pixels are fully lit or fully shadowed and stop here)
   float searchR = ${MAX_PENUMBRA.toFixed(1)};
   float blockers = 0.0, blockerSum = 0.0;
-  for ( int i = 0; i < 16; i ++ ) {
+  for ( int i = 0; i < 12; i ++ ) {
     vec2 o = disc[ i ] * searchR * texelSize;
     float d = unpackRGBAToDepth( texture2D( shadowMap, shadowCoord.xy + o ) );
     float z = shadowCoord.z + dot( dzduv, o );
@@ -52,6 +53,8 @@ const PCSS = /* glsl */ `
   }
   if ( blockers < 0.5 ) {
     shadow = 1.0;
+  } else if ( blockers > 11.5 ) {
+    shadow = 0.0; // deep in the umbra: nothing to filter
   } else {
     // 2. the penumbra: wider the further the blockers are in front (shadowRadius texels per unit depth)
     float avg = blockerSum / blockers;
@@ -67,19 +70,31 @@ const PCSS = /* glsl */ `
 `;
 
 let installed = false;
-/** Patch the shadow chunk once (before any material compiles). */
+/**
+ * Patch the shadow chunk once (before any material compiles). A material with the define
+ * CHEAP_SHADOW (cheapShadow below) keeps three.js's own filter: the tree cards, people and the
+ * far city, where the few extra texels of penumbra are never seen but the overdraw is large.
+ */
 export function installSoftShadows() {
   if (installed) return;
   installed = true;
   const chunk = THREE.ShaderChunk.shadowmap_pars_fragment;
-  const start = chunk.indexOf('#elif defined( SHADOWMAP_TYPE_PCF_SOFT )');
+  const marker = '#elif defined( SHADOWMAP_TYPE_PCF_SOFT )';
+  const start = chunk.indexOf(marker);
   const end = chunk.indexOf('#elif defined( SHADOWMAP_TYPE_VSM )');
   if (start < 0 || end < 0) {
     console.warn('soft shadows: the shadow chunk has changed, keeping PCFSoft');
     return;
   }
+  const pcfSoft = chunk.slice(start + marker.length, end);
   THREE.ShaderChunk.shadowmap_pars_fragment =
-    `${chunk.slice(0, start)}#elif defined( SHADOWMAP_TYPE_PCF_SOFT )\n${PCSS}\n\t\t${chunk.slice(end)}`;
+    `${chunk.slice(0, start)}${marker}\n#ifdef CHEAP_SHADOW\n${pcfSoft}\n#else\n${PCSS}\n#endif\n\t\t${chunk.slice(end)}`;
+}
+
+/** Mark a material to receive shadows with the plain filter (see installSoftShadows). */
+export function cheapShadow(material) {
+  material.defines = { ...(material.defines ?? {}), CHEAP_SHADOW: '' };
+  return material;
 }
 
 /**

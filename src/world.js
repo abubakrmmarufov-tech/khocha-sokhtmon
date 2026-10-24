@@ -11,7 +11,7 @@ import { CARS, PALMS, PEOPLE, TREES, toScene } from './config.js';
 import { addCars, addPalms, addPeople, addTrees } from './props.js';
 import { houseSet } from './houseTextures.js';
 import { Q } from './quality.js';
-import { sunPenumbraScale } from './shadows.js';
+import { cheapShadow, sunPenumbraScale } from './shadows.js';
 import skyInfo from '../public/env/sky.json';
 
 const ENV = `${import.meta.env.BASE_URL}env/`;
@@ -86,7 +86,7 @@ function city(scene) {
     }
   }
   const geo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
-  const mat = new THREE.MeshStandardMaterial({ name: 'City', color: 0xffffff, roughness: 0.95 });
+  const mat = cheapShadow(new THREE.MeshStandardMaterial({ name: 'City', color: 0xffffff, roughness: 0.95 }));
   const im = new THREE.InstancedMesh(geo, mat, boxes.length);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), col = new THREE.Color();
   boxes.forEach((b, i) => {
@@ -296,16 +296,16 @@ export function buildWorld(scene, renderer, after = Promise.resolve()) {
   // the plain beyond the modelled ground (3 x 3 km) out to the haze, so the horizon is the fog's
   const plain = new THREE.Mesh(
     new THREE.RingGeometry(225, 16000, 96, 1).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0x7d9e48, roughness: 1 }),
+    cheapShadow(new THREE.MeshStandardMaterial({ color: 0x7d9e48, roughness: 1 })),
   );
   plain.position.y = -0.12;
   plain.receiveShadow = false;
   scene.add(plain);
   // the streets round the block run on from the edge of the modelled site (240 m) out to the city
   {
-    const road = new THREE.MeshStandardMaterial({ name: 'Far road', color: 0x55575a, roughness: 0.95 });
-    const walk = new THREE.MeshStandardMaterial({ name: 'Far walk', color: 0xb9b2a8, roughness: 0.95 });
-    const median = new THREE.MeshStandardMaterial({ name: 'Far median', color: 0x5f8a36, roughness: 1 });
+    const road = cheapShadow(new THREE.MeshStandardMaterial({ name: 'Far road', color: 0x55575a, roughness: 0.95 }));
+    const walk = cheapShadow(new THREE.MeshStandardMaterial({ name: 'Far walk', color: 0xb9b2a8, roughness: 0.95 }));
+    const median = cheapShadow(new THREE.MeshStandardMaterial({ name: 'Far median', color: 0x5f8a36, roughness: 1 }));
     const strip = (x0, y0, x1, y1, mat, h) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(x1 - x0), Math.abs(y1 - y0)).rotateX(-Math.PI / 2), mat);
       m.position.set((x0 + x1) / 2, h, -(y0 + y1) / 2);
