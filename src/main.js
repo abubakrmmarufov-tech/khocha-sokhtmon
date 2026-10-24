@@ -271,7 +271,7 @@ function updateOverlays() {
         const lit = a === state.apt || a === state.hoverApt;
         show = true; onFloor = true; color = taken ?? (lit ? 0xffa42b : ACCENT);
         edges = a === state.apt ? OUTLINE.chosen : a === state.hoverApt ? OUTLINE.hover : taken ? OUTLINE[statusOf(a)] : OUTLINE.open;
-        op = a === state.apt ? 0.42 : a === state.hoverApt ? 0.36 : taken ? 0.3 : 0.06;
+        op = taken ? (lit ? 0.62 : 0.5) : a === state.apt ? 0.42 : a === state.hoverApt ? 0.36 : 0.06;
         if (filterActive() && !matches(a)) [op, edges] = [0.0, null];
       } else if (hoverFloor && a.floor < state.floor) {
         // (a floor above the open one is cut away: nothing to light)

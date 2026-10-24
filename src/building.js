@@ -28,10 +28,11 @@ export const OUTLINE = {
   open: line(0xf2c98f, 1.6, 0.9),
   hover: line(0xffa42b, 4.5, 1, false),
   chosen: line(0xff8a00, 4.5, 1, false),
-  // a sold (or taken off sale) and a reserved flat of the open floor (src/sales.js)
-  sold: line(0xe5392f, 2.6, 1),
-  closed: line(0xe5392f, 2.6, 1),
-  reserved: line(0xf2b100, 2.6, 1),
+  // a sold (or taken off sale) and a reserved flat of the open floor (src/sales.js): drawn over the
+  // walls and furniture like the chosen one, a little thinner
+  sold: line(0xe5392f, 3.4, 1, false),
+  closed: line(0xe5392f, 3.4, 1, false),
+  reserved: line(0xf2b100, 3.4, 1, false),
 };
 
 export async function loadComplex(apartments, renderer, onProgress) {
