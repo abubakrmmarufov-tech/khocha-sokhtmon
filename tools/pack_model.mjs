@@ -49,9 +49,10 @@ if (hasSite) {
   const siteScene = siteDoc.getRoot().getDefaultScene() ?? siteDoc.getRoot().listScenes()[0];
   for (const n of siteScene.listChildren()) if (n.getName() !== SITE) siteScene.removeChild(n);
   for (const n of scene.listChildren()) if (n.getName() === SITE) scene.removeChild(n);
-  await siteDoc.transform(prune(), meshopt({ encoder: MeshoptEncoder, level: 'high' }));
+  // (keepAttributes: the textures are assigned at runtime, so to prune() every UV set looks unused)
+  await siteDoc.transform(prune({ keepAttributes: true }), meshopt({ encoder: MeshoptEncoder, level: 'high' }));
   await io.write(siteFile, siteDoc);
 }
-await doc.transform(prune(), meshopt({ encoder: MeshoptEncoder, level: 'high' }));
+await doc.transform(prune({ keepAttributes: true }), meshopt({ encoder: MeshoptEncoder, level: 'high' }));
 await io.write(file, doc);
 console.log(`${rounded} UV sets rounded to 1/${STEP} m; ${file} ${before} -> ${mb(file)}${hasSite ? ` + ${siteFile} ${mb(siteFile)}` : ' (no Site node: one file)'}`);
